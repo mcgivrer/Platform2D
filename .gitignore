@@ -1,0 +1,9 @@
+/.settings
+/.vscode
+/.idea
+.classpath
+.project
+/target
+**/*.class
+/build
+/src/main/javadoc/overview.html
