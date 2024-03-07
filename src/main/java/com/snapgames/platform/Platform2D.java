@@ -147,7 +147,10 @@ public class Platform2D implements KeyListener {
   }
 
   private void create() {
-    world = new World(new Vec2d(0, -0.981), new Rectangle2D.Double(0, 0, 320, 200));
+    // define the game World
+    world = new World(new Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
+
+    // add a player object
     GameObject player = new GameObject(
         "player",
         bufferSize.width >> 1, bufferSize.height >> 1,
@@ -158,16 +161,33 @@ public class Platform2D implements KeyListener {
     player.attributes.put("live", 3);
     addGameObject(player);
 
-    GameObject wind = new GameObject("wind",
+    // Add a constrain
+    GameObject water = new GameObject("water",
         0, world.getPlayArea().getHeight() * 0.40,
         world.getPlayArea().getWidth(),
         world.getPlayArea().getHeight() * 0.60);
-    wind.priority = 2;
-    wind.fillColor = new Color(0.2f, 0.0f, 0.4f, 0.3f);
-    wind.borderColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
-    wind.forces.add(new Vec2d(-200, 0));
-    world.getConstrains().add(wind);
-    addGameObject(wind);
+    water.priority = 2;
+    water.fillColor = new Color(0.2f, 0.0f, 0.4f, 0.3f);
+    water.borderColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
+    water.forces.add(new Vec2d(0, -0.5));
+    world.constrains.add(water);
+    addGameObject(water);
+
+    // add some enemies
+    for (int i = 0; i < 10; i++) {
+      // add a player object
+      GameObject enemy = new GameObject(
+          "enemy_" + i,
+          Math.random() * bufferSize.width, Math.random() * bufferSize.height,
+          8, 8);
+      enemy.material = new Material("enemy", 0.7, 0.80, 0.99);
+      enemy.fillColor = Color.BLUE;
+      enemy.borderColor = Color.DARK_GRAY;
+      enemy.attributes.put("energy", 100);
+      enemy.attributes.put("mana", 100);
+      enemy.priority = 10 + i;
+      addGameObject(enemy);
+    }
 
   }
 
@@ -231,18 +251,21 @@ public class Platform2D implements KeyListener {
           // compute acceleration applied to the GameObject o
           o.ax = 0;
           o.ay = 0;
+
+          // apply gravity
+          o.forces.add(world.getGravity());
+
+          // compute resulting acceleration
           for (Vec2d v : o.forces) {
             o.ax += v.x;
             o.ay += v.y;
           }
           // if o is under some world constrain
           for (GameObject c : world.constrains) {
-            if (c.contains(o) || c.intersects(o)) {
-              if (c.forces.size() > 0) {
-                for (Vec2d v : c.forces) {
-                  o.ax += v.x;
-                  o.ay += v.y;
-                }
+            if (c.contains(o)) {
+              for (Vec2d v : c.forces) {
+                o.ax += v.x;
+                o.ay += v.y;
               }
             }
           }
@@ -258,8 +281,8 @@ public class Platform2D implements KeyListener {
           o.dx *= o.material.friction;
           o.dy *= o.material.friction;
 
+          // Constrains the Gameobject o into the play area.
           Rectangle2D playArea = world.getPlayArea();
-
           if (playArea.intersects(o) || !playArea.contains(o)) {
             if (o.x < 0) {
               o.x = 0;
