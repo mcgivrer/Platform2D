@@ -6,6 +6,7 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,10 +17,33 @@ import javax.swing.JFrame;
 
 public class Platform2D implements KeyListener {
 
-  public static class GameObject extends Rectangle {
+  public static class Material {
+
+    public static Material DEFAULT = new Material("default", 1.0, 0.70, 0.98);
+
+    public String name;
+    public double density;
+    public double elasticity;
+    public double friction;
+
+    public Material(String name, double d, double e, double f) {
+      this.name = name;
+      this.density = d;
+      this.elasticity = e;
+      this.friction = f;
+    }
+
+  }
+
+  public static class GameObject extends Rectangle2D.Double {
     private static long index = 0;
     private long id = index++;
     private String name = "gameobject_" + id;
+    public double dx, dy;
+    public Material material = Material.DEFAULT;
+
+    public Color borderColor = Color.WHITE;
+    public Color fillColor = Color.RED;
 
     public GameObject(String name) {
       super();
@@ -107,18 +131,18 @@ public class Platform2D implements KeyListener {
   private void input() {
     GameObject player = objectMap.get("player");
     if (isKeyPressed(KeyEvent.VK_UP)) {
-      player.y -= 2;
+      player.dy = -2;
     }
     if (isKeyPressed(KeyEvent.VK_DOWN)) {
-      player.y += 2;
+      player.dy = +2;
 
     }
     if (isKeyPressed(KeyEvent.VK_LEFT)) {
-      player.x -= 2;
+      player.dx = -2;
 
     }
     if (isKeyPressed(KeyEvent.VK_RIGHT)) {
-      player.x += 2;
+      player.dx = +2;
     }
 
     if (isKeyPressed(KeyEvent.VK_X)) {
@@ -129,18 +153,29 @@ public class Platform2D implements KeyListener {
 
   private void update() {
     objects.forEach(o -> {
+
+      o.x += o.dx;
+      o.y += o.dy;
+
+      o.dx *= o.material.friction;
+      o.dy *= o.material.friction;
+
       if (playArea.intersects(o)) {
         if (o.x < 0) {
           o.x = 0;
+          o.dx *= -o.material.elasticity;
         }
         if (o.x > playArea.width - o.width) {
           o.x = playArea.width - o.width;
+          o.dx *= -o.material.elasticity;
         }
         if (o.y < 0) {
           o.y = 0;
+          o.dy *= -o.material.elasticity;
         }
         if (o.y > playArea.height - o.width) {
           o.y = playArea.height - o.height;
+          o.dy *= -o.material.elasticity;
         }
       }
     });
@@ -153,9 +188,11 @@ public class Platform2D implements KeyListener {
     gb.clearRect(0, 0, 640, 400);
 
     // draw all the platforme game scene.
-    gb.setColor(Color.RED);
     objects.forEach(o -> {
+      gb.setColor(o.fillColor);
       gb.fill(o);
+      gb.setColor(o.borderColor);
+      gb.draw(o);
     });
     gb.dispose();
 
