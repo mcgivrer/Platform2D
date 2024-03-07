@@ -3,7 +3,6 @@ package com.snapgames.platform;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
-import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.geom.Rectangle2D;
@@ -80,6 +79,24 @@ public class Platform2D implements KeyListener {
     }
   }
 
+  public static class World {
+    private Vec2d gravity;
+    private Rectangle2D playArea;
+    public World(Vec2d gravity, Rectangle2D playAreaSize) {
+      this.gravity = gravity;
+      this.playArea = playAreaSize;
+    }
+
+    public Vec2d getGravity() {
+      return gravity;
+    }
+
+    public Rectangle2D getPlayArea() {
+      return playArea;
+    }
+
+  }
+
   BufferedImage buffer;
   JFrame frame;
 
@@ -94,13 +111,12 @@ public class Platform2D implements KeyListener {
   private List<GameObject> objects = new ArrayList<>();
   private Map<String, GameObject> objectMap = new HashMap<>();
 
-  private Rectangle playArea;
+  private World world;
 
   public Platform2D(String appName, Dimension bufferSize, Dimension screenSize) {
     this.name = appName;
     this.bufferSize = bufferSize;
     this.screenSize = screenSize;
-    this.playArea = new Rectangle(0, 0, bufferSize.width, bufferSize.height);
   }
 
   private void initialize(String[] args) {
@@ -118,6 +134,7 @@ public class Platform2D implements KeyListener {
   }
 
   private void create() {
+    world = new World(new Vec2d(0, -0.981), new Rectangle2D.Double(0, 0, 320, 200));
     GameObject player = new GameObject(
         "player",
         bufferSize.width >> 1, bufferSize.height >> 1,
@@ -199,14 +216,16 @@ public class Platform2D implements KeyListener {
       o.dx *= o.material.friction;
       o.dy *= o.material.friction;
 
+      Rectangle2D playArea = world.getPlayArea();
+
       if (playArea.intersects(o) || !playArea.contains(o)) {
         if (o.x < 0) {
           o.x = 0;
           o.dx *= -o.material.elasticity;
           o.contact = true;
         }
-        if (o.x > playArea.width - o.width) {
-          o.x = playArea.width - o.width;
+        if (o.x > playArea.getWidth() - o.width) {
+          o.x = playArea.getWidth() - o.width;
           o.dx *= -o.material.elasticity;
           o.contact = true;
         }
@@ -215,8 +234,8 @@ public class Platform2D implements KeyListener {
           o.dy *= -o.material.elasticity;
           o.contact = true;
         }
-        if (o.y > playArea.height - o.width) {
-          o.y = playArea.height - o.height;
+        if (o.y > playArea.getHeight() - o.width) {
+          o.y = playArea.getHeight() - o.height;
           o.dy *= -o.material.elasticity;
           o.contact = true;
         }
