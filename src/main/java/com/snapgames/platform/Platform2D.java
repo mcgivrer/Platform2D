@@ -16,6 +16,16 @@ import java.util.Map;
 import javax.swing.JFrame;
 
 public class Platform2D implements KeyListener {
+  public static final int FPS = 60;
+
+  public static class Vec2d {
+    public double x, y;
+
+    public Vec2d(double x, double y) {
+      this.x = x;
+      this.y = y;
+    }
+  }
 
   public static class Material {
 
@@ -32,7 +42,6 @@ public class Platform2D implements KeyListener {
       this.elasticity = e;
       this.friction = f;
     }
-
   }
 
   public static class GameObject extends Rectangle2D.Double {
@@ -40,10 +49,17 @@ public class Platform2D implements KeyListener {
     private long id = index++;
     private String name = "gameobject_" + id;
     public double dx, dy;
+    public double ax, ay;
+
+    public List<Vec2d> forces = new ArrayList<>();
+
     public Material material = Material.DEFAULT;
 
     public Color borderColor = Color.WHITE;
     public Color fillColor = Color.RED;
+
+    public Map<String, Object> attributes = new HashMap<>();
+    public boolean contact;
 
     public GameObject(String name) {
       super();
@@ -80,7 +96,7 @@ public class Platform2D implements KeyListener {
 
   private Rectangle playArea;
 
-  Platform2D(String appName, Dimension bufferSize, Dimension screenSize) {
+  public Platform2D(String appName, Dimension bufferSize, Dimension screenSize) {
     this.name = appName;
     this.bufferSize = bufferSize;
     this.screenSize = screenSize;
@@ -106,6 +122,10 @@ public class Platform2D implements KeyListener {
         "player",
         bufferSize.width >> 1, bufferSize.height >> 1,
         16, 16);
+    player.material = new Material("player", 1.0, 0.30, 0.92);
+    player.attributes.put("energy", 100);
+    player.attributes.put("mana", 100);
+    player.attributes.put("live", 3);
     addGameObject(player);
   }
 
@@ -121,28 +141,38 @@ public class Platform2D implements KeyListener {
   }
 
   private void loop() {
+    long currentTime = System.currentTimeMillis();
+    long previous = currentTime;
+    double elapse = 0;
     while (!exit) {
+      currentTime = System.currentTimeMillis();
+      elapse = currentTime - previous < (1000 / FPS) ? currentTime - previous : 16;
       input();
-      update();
+      update(elapse);
       draw();
+      previous = currentTime;
+      try {
+        Thread.sleep(1000 / FPS);
+      } catch (InterruptedException e) {
+        System.err.printf("Unable to sleep for 16ms%n");
+      }
     }
   }
 
   private void input() {
     GameObject player = objectMap.get("player");
+    double speed = (double) player.attributes.getOrDefault("speed", 0.5);
     if (isKeyPressed(KeyEvent.VK_UP)) {
-      player.dy = -2;
+      player.forces.add(new Vec2d(0, -speed));
     }
     if (isKeyPressed(KeyEvent.VK_DOWN)) {
-      player.dy = +2;
-
+      player.forces.add(new Vec2d(0, speed));
     }
     if (isKeyPressed(KeyEvent.VK_LEFT)) {
-      player.dx = -2;
-
+      player.forces.add(new Vec2d(-speed, 0));
     }
     if (isKeyPressed(KeyEvent.VK_RIGHT)) {
-      player.dx = +2;
+      player.forces.add(new Vec2d(speed, 0));
     }
 
     if (isKeyPressed(KeyEvent.VK_X)) {
@@ -151,33 +181,47 @@ public class Platform2D implements KeyListener {
 
   }
 
-  private void update() {
+  private void update(double elapse) {
     objects.forEach(o -> {
+      o.ax = 0;
+      o.ay = 0;
+      for (Vec2d v : o.forces) {
+        o.ax += v.x;
+        o.ay += v.y;
+      }
 
-      o.x += o.dx;
-      o.y += o.dy;
+      o.dx = o.dx + o.ax * elapse * 0.005;
+      o.dy = o.dy + o.ay * elapse * 0.005;
+
+      o.x += o.dx * elapse;
+      o.y += o.dy * elapse;
 
       o.dx *= o.material.friction;
       o.dy *= o.material.friction;
 
-      if (playArea.intersects(o)) {
+      if (playArea.intersects(o) || !playArea.contains(o)) {
         if (o.x < 0) {
           o.x = 0;
           o.dx *= -o.material.elasticity;
+          o.contact = true;
         }
         if (o.x > playArea.width - o.width) {
           o.x = playArea.width - o.width;
           o.dx *= -o.material.elasticity;
+          o.contact = true;
         }
         if (o.y < 0) {
           o.y = 0;
           o.dy *= -o.material.elasticity;
+          o.contact = true;
         }
         if (o.y > playArea.height - o.width) {
           o.y = playArea.height - o.height;
           o.dy *= -o.material.elasticity;
+          o.contact = true;
         }
       }
+      o.forces.clear();
     });
   }
 
