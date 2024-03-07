@@ -119,6 +119,19 @@ public class Platform2D implements KeyListener, ComponentListener {
         }
     }
 
+    public static class TextObject extends GameObject {
+        String text;
+
+        public TextObject(String name) {
+            super(name);
+        }
+
+        TextObject setText(String text) {
+            this.text = text;
+            return this;
+        }
+    }
+
     /**
      * A {@link World} entity to host gravity and play area and the world containing objects.
      *
@@ -183,8 +196,8 @@ public class Platform2D implements KeyListener, ComponentListener {
         loadConfiguration("/config.properties");
 
         buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
-        frame = new JFrame("Platform2D");
 
+        frame = new JFrame(messages.getString("app.title"));
         frame.setPreferredSize(screenSize);
         frame.setMaximumSize(screenSize);
         frame.setMinimumSize(screenSize);
@@ -194,6 +207,7 @@ public class Platform2D implements KeyListener, ComponentListener {
         frame.pack();
         frame.setVisible(true);
         frame.createBufferStrategy(3);
+
         create();
     }
 
@@ -401,11 +415,23 @@ public class Platform2D implements KeyListener, ComponentListener {
 
         // draw all the platforme game scene.
         objects.forEach(o -> {
-            gb.setColor(o.fillColor);
-            gb.fill(o);
-            gb.setColor(o.borderColor);
-            gb.draw(o);
-        });
+            switch (o.getClass().getSimpleName()) {
+                case "GameObject" -> {
+                    gb.setColor(o.fillColor);
+                    gb.fill(o);
+                    gb.setColor(o.borderColor);
+                    gb.draw(o);
+                }
+                case "TextObject" -> {
+                    TextObject to = (TextObject) o;
+                    gb.setColor(o.fillColor);
+                    gb.drawString(to.text, (int) to.x, (int) to.y);
+                }
+                default -> {
+                    error("No renderering for %s", o.getClass().getSimpleName());
+                }
+            }
+*});
         gb.dispose();
 
         // draw to screen.
