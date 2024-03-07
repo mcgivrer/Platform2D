@@ -59,13 +59,15 @@ public class Platform2D implements KeyListener {
 
     public Map<String, Object> attributes = new HashMap<>();
     public boolean contact;
+    public boolean staticObject = false;
+    public int priority = 1;
 
     public GameObject(String name) {
       super();
       this.name = name;
     }
 
-    public GameObject(String name, int x, int y, int w, int h) {
+    public GameObject(String name, double x, double y, double w, double h) {
       super(x, y, w, h);
       this.name = name;
     }
@@ -82,9 +84,16 @@ public class Platform2D implements KeyListener {
   public static class World {
     private Vec2d gravity;
     private Rectangle2D playArea;
+    private List<GameObject> constrains = new ArrayList<>();
+
     public World(Vec2d gravity, Rectangle2D playAreaSize) {
       this.gravity = gravity;
       this.playArea = playAreaSize;
+    }
+
+    public void addConstrain(GameObject constrain) {
+      constrain.staticObject = true;
+      constrains.add(constrain);
     }
 
     public Vec2d getGravity() {
@@ -93,6 +102,10 @@ public class Platform2D implements KeyListener {
 
     public Rectangle2D getPlayArea() {
       return playArea;
+    }
+
+    public List<GameObject> getConstrains() {
+      return constrains;
     }
 
   }
@@ -144,6 +157,18 @@ public class Platform2D implements KeyListener {
     player.attributes.put("mana", 100);
     player.attributes.put("live", 3);
     addGameObject(player);
+
+    GameObject wind = new GameObject("wind",
+        0, world.getPlayArea().getHeight() * 0.40,
+        world.getPlayArea().getWidth(),
+        world.getPlayArea().getHeight() * 0.60);
+    wind.priority = 2;
+    wind.fillColor = new Color(0.2f, 0.0f, 0.4f, 0.3f);
+    wind.borderColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
+    wind.forces.add(new Vec2d(-200, 0));
+    world.getConstrains().add(wind);
+    addGameObject(wind);
+
   }
 
   private void addGameObject(GameObject gameObject) {
@@ -199,49 +224,66 @@ public class Platform2D implements KeyListener {
   }
 
   private void update(double elapse) {
-    objects.forEach(o -> {
-      o.ax = 0;
-      o.ay = 0;
-      for (Vec2d v : o.forces) {
-        o.ax += v.x;
-        o.ay += v.y;
-      }
+    objects.stream()
+        .filter(o -> !o.staticObject)
+        .sorted((a, b) -> Integer.compare(b.priority, a.priority))
+        .forEach(o -> {
+          // compute acceleration applied to the GameObject o
+          o.ax = 0;
+          o.ay = 0;
+          for (Vec2d v : o.forces) {
+            o.ax += v.x;
+            o.ay += v.y;
+          }
+          // if o is under some world constrain
+          for (GameObject c : world.constrains) {
+            if (c.contains(o) || c.intersects(o)) {
+              if (c.forces.size() > 0) {
+                for (Vec2d v : c.forces) {
+                  o.ax += v.x;
+                  o.ay += v.y;
+                }
+              }
+            }
+          }
+          // compute resulting speed
+          o.dx = o.dx + o.ax * elapse * 0.005;
+          o.dy = o.dy + o.ay * elapse * 0.005;
 
-      o.dx = o.dx + o.ax * elapse * 0.005;
-      o.dy = o.dy + o.ay * elapse * 0.005;
+          // get the GameObject o position
+          o.x += o.dx * elapse;
+          o.y += o.dy * elapse;
 
-      o.x += o.dx * elapse;
-      o.y += o.dy * elapse;
+          // apply friction "force" to the velocity
+          o.dx *= o.material.friction;
+          o.dy *= o.material.friction;
 
-      o.dx *= o.material.friction;
-      o.dy *= o.material.friction;
+          Rectangle2D playArea = world.getPlayArea();
 
-      Rectangle2D playArea = world.getPlayArea();
-
-      if (playArea.intersects(o) || !playArea.contains(o)) {
-        if (o.x < 0) {
-          o.x = 0;
-          o.dx *= -o.material.elasticity;
-          o.contact = true;
-        }
-        if (o.x > playArea.getWidth() - o.width) {
-          o.x = playArea.getWidth() - o.width;
-          o.dx *= -o.material.elasticity;
-          o.contact = true;
-        }
-        if (o.y < 0) {
-          o.y = 0;
-          o.dy *= -o.material.elasticity;
-          o.contact = true;
-        }
-        if (o.y > playArea.getHeight() - o.width) {
-          o.y = playArea.getHeight() - o.height;
-          o.dy *= -o.material.elasticity;
-          o.contact = true;
-        }
-      }
-      o.forces.clear();
-    });
+          if (playArea.intersects(o) || !playArea.contains(o)) {
+            if (o.x < 0) {
+              o.x = 0;
+              o.dx *= -o.material.elasticity;
+              o.contact = true;
+            }
+            if (o.x > playArea.getWidth() - o.width) {
+              o.x = playArea.getWidth() - o.width;
+              o.dx *= -o.material.elasticity;
+              o.contact = true;
+            }
+            if (o.y < 0) {
+              o.y = 0;
+              o.dy *= -o.material.elasticity;
+              o.contact = true;
+            }
+            if (o.y > playArea.getHeight() - o.width) {
+              o.y = playArea.getHeight() - o.height;
+              o.dy *= -o.material.elasticity;
+              o.contact = true;
+            }
+          }
+          o.forces.clear();
+        });
   }
 
   private void draw() {
