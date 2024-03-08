@@ -119,6 +119,25 @@ public class Platform2D implements KeyListener, ComponentListener {
         }
     }
 
+    public static class ConstrainObject extends GameObject {
+
+        public ConstrainObject(String name) {
+            super(name);
+            this.staticObject = true;
+        }
+
+        public ConstrainObject(String name, double x, double y, double w, double h) {
+            super(name);
+            setRect(x, y, w, h);
+        }
+
+        public ConstrainObject setForce(Vec2d f) {
+            forces.clear();
+            forces.add(f);
+            return this;
+        }
+    }
+
     /**
      * A {@link World} entity to host gravity and play area and the world containing objects.
      *
@@ -128,14 +147,14 @@ public class Platform2D implements KeyListener, ComponentListener {
     public static class World {
         private Vec2d gravity;
         private Rectangle2D playArea;
-        private List<GameObject> constrains = new ArrayList<>();
+        private List<ConstrainObject> constrains = new ArrayList<>();
 
         public World(Vec2d gravity, Rectangle2D playAreaSize) {
             this.gravity = gravity;
             this.playArea = playAreaSize;
         }
 
-        public void addConstrain(GameObject constrain) {
+        public void addConstrain(ConstrainObject constrain) {
             constrain.staticObject = true;
             constrains.add(constrain);
         }
@@ -148,7 +167,7 @@ public class Platform2D implements KeyListener, ComponentListener {
             return playArea;
         }
 
-        public List<GameObject> getConstrains() {
+        public List<ConstrainObject> getConstrains() {
             return constrains;
         }
 
@@ -235,9 +254,9 @@ public class Platform2D implements KeyListener, ComponentListener {
 
         // add a player object
         GameObject player = new GameObject(
-                "player",
-                bufferSize.width >> 1, bufferSize.height >> 1,
-                16, 16);
+            "player",
+            bufferSize.width >> 1, bufferSize.height >> 1,
+            16, 16);
         player.material = new Material("player", 1.0, 0.30, 0.92);
         player.attributes.put("energy", 100);
         player.attributes.put("mana", 100);
@@ -245,14 +264,13 @@ public class Platform2D implements KeyListener, ComponentListener {
         addGameObject(player);
 
         // Add a constrain
-        GameObject water = new GameObject("water",
-                0, world.getPlayArea().getHeight() * 0.70,
-                world.getPlayArea().getWidth(),
-                world.getPlayArea().getHeight() * 0.30);
+        ConstrainObject water = new ConstrainObject("water",
+            0, world.getPlayArea().getHeight() * 0.70,
+            world.getPlayArea().getWidth(),
+            world.getPlayArea().getHeight() * 0.30).setForce(new Vec2d(0, 2.0));
         water.priority = 2;
         water.fillColor = new Color(0.2f, 0.2f, 0.7f, 0.4f);
         water.borderColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
-        water.forces.add(new Vec2d(0, -0.5));
         world.constrains.add(water);
         addGameObject(water);
 
@@ -260,9 +278,9 @@ public class Platform2D implements KeyListener, ComponentListener {
         for (int i = 0; i < 10; i++) {
             // add a player object
             GameObject enemy = new GameObject(
-                    "enemy_" + i,
-                    Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                    8, 8);
+                "enemy_" + i,
+                Math.random() * bufferSize.width, Math.random() * bufferSize.height,
+                8, 8);
             enemy.material = new Material("enemy", 0.7, 0.80, 0.99);
             enemy.fillColor = Color.BLUE;
             enemy.borderColor = Color.DARK_GRAY;
@@ -328,69 +346,68 @@ public class Platform2D implements KeyListener, ComponentListener {
 
     private void update(double elapse) {
         objects.stream()
-                .filter(o -> !o.staticObject)
-                .sorted((a, b) -> Integer.compare(b.priority, a.priority))
-                .forEach(o -> {
-                    // compute acceleration applied to the GameObject o
-                    o.ax = 0;
-                    o.ay = 0;
+            .filter(o -> !o.staticObject)
+            .sorted((a, b) -> Integer.compare(b.priority, a.priority))
+            .forEach(o -> {
+                // compute acceleration applied to the GameObject o
+                o.ax = 0;
+                o.ay = 0;
 
-                    // apply gravity
-                    o.forces.add(world.getGravity());
+                // apply gravity
+                o.forces.add(world.getGravity());
 
-                    // compute resulting acceleration
-                    for (Vec2d v : o.forces) {
-                        o.ax += v.x;
-                        o.ay += v.y;
-                    }
+                // compute resulting acceleration
+                for (Vec2d v : o.forces) {
+                    o.ax += v.x;
+                    o.ay += v.y;
+                }
 
-                    // if o is under some world constrain
-                    for (GameObject c : world.constrains) {
-                        if (c.contains(o)) {
-                            for (Vec2d v : c.forces) {
-                                o.ax += v.x;
-                                o.ay += v.y;
-                            }
+                // if o is under some world constrain
+                for (ConstrainObject c : world.constrains) {
+                    if (c.contains(o) || o.intersects(c)) {
+                        for (Vec2d v : c.forces) {
+                            o.ax += v.x;
+                            o.ay += v.y;
                         }
                     }
-                    // compute resulting speed
-                    o.dx = o.dx + o.ax * elapse * 0.005;
-                    o.dy = o.dy + o.ay * elapse * 0.005;
+                }
+                // compute resulting speed
+                o.dx = o.dx + o.ax * elapse * 0.005;
+                o.dy = o.dy + o.ay * elapse * 0.005;
 
-                    // get the GameObject o position
-                    o.x += o.dx * elapse;
-                    o.y += o.dy * elapse;
+                // get the GameObject o position
+                o.x += o.dx * elapse;
+                o.y += o.dy * elapse;
 
-                    // apply friction "force" to the velocity
-                    o.dx *= o.material.friction;
-                    o.dy *= o.material.friction;
+                // apply friction "force" to the velocity
+                o.dx *= o.material.friction;
+                o.dy *= o.material.friction;
 
-                    // Constrains the Gameobject o into the play area.
-                    Rectangle2D playArea = world.getPlayArea();
-                    if (playArea.intersects(o) || !playArea.contains(o)) {
-                        if (o.x < 0) {
-                            o.x = 0;
-                            o.dx *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.x > playArea.getWidth() - o.width) {
-                            o.x = playArea.getWidth() - o.width;
-                            o.dx *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.y < 0) {
-                            o.y = 0;
-                            o.dy *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.y > playArea.getHeight() - o.width) {
-                            o.y = playArea.getHeight() - o.height;
-                            o.dy *= -o.material.elasticity;
-                            o.contact = true;
-                        }
+                // Constrains the GameObject o into the play area.
+                Rectangle2D playArea = world.getPlayArea();
+                if (playArea.intersects(o) || !playArea.contains(o)) {
+                    if (o.x < 0) {
+                        o.x = 0;
+                        o.dx *= -o.material.elasticity;
+                        o.contact = true;
                     }
-                    o.forces.clear();
-                });
+                    if (o.x > playArea.getWidth() - o.width) {
+                        o.x = playArea.getWidth() - o.width;
+                        o.dx *= -o.material.elasticity;
+                        o.contact = true;
+                    }
+                    if (o.y < 0) {
+                        o.y = 0;
+                        o.dy *= -o.material.elasticity;
+                        o.contact = true;
+                    }
+                    if (o.y > playArea.getHeight() - o.width) {
+                        o.y = playArea.getHeight() - o.height;
+                        o.dy *= -o.material.elasticity;
+                        o.contact = true;
+                    }
+                }
+            });
     }
 
     private void draw() {
@@ -399,21 +416,37 @@ public class Platform2D implements KeyListener, ComponentListener {
         gb.setBackground(Color.BLACK);
         gb.clearRect(0, 0, 640, 400);
 
-        // draw all the platforme game scene.
+        // draw all the platform game scene.
         objects.forEach(o -> {
             gb.setColor(o.fillColor);
             gb.fill(o);
             gb.setColor(o.borderColor);
             gb.draw(o);
+            //if (debug > 3) {
+            // show all applied forces
+            for (Vec2d f : o.forces) {
+                gb.setColor(Color.BLUE);
+                gb.drawLine((int) (o.x + (o.width * 0.5)), (int) (o.y + (o.height * 0.5)),
+                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0), (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+            }
+            gb.setColor(Color.ORANGE);
+            gb.drawLine((int) (o.x + (o.width * 0.5)), (int) (o.y + (o.height * 0.5)),
+                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0), (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+            gb.setColor(Color.YELLOW);
+            gb.drawLine((int) (o.x + (o.width * 0.5)), (int) (o.y + (o.height * 0.5)),
+                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0), (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+
+            //}
+            o.forces.clear();
         });
         gb.dispose();
 
         // draw to screen.
         Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
         g.drawImage(buffer,
-                0, 0, screenSize.width, screenSize.height,
-                0, 0, bufferSize.width, bufferSize.height,
-                null);
+            0, 0, screenSize.width, screenSize.height,
+            0, 0, bufferSize.width, bufferSize.height,
+            null);
         g.dispose();
         frame.getBufferStrategy().show();
     }
@@ -497,9 +530,9 @@ public class Platform2D implements KeyListener, ComponentListener {
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-                "Platform2D",
-                new Dimension(320, 200),
-                new Dimension(640, 400));
+            "Platform2D",
+            new Dimension(320, 200),
+            new Dimension(640, 400));
         platform2d.run(args);
     }
 }
