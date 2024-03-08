@@ -1,8 +1,6 @@
 package com.snapgames.platform;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.KeyEvent;
@@ -13,8 +11,9 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.List;
 
-import javax.swing.JFrame;
+import javax.swing.*;
 
 /**
  * The {@link Platform2D} class base of the platform framework.
@@ -22,7 +21,7 @@ import javax.swing.JFrame;
  * @author Frédéric Delorme
  * @since 1.0.0
  */
-public class Platform2D implements KeyListener, ComponentListener {
+public class Platform2D extends JPanel implements KeyListener, ComponentListener {
     public static final int FPS = 60;
 
     /**
@@ -83,6 +82,7 @@ public class Platform2D implements KeyListener, ComponentListener {
      */
     public static class GameObject extends Rectangle2D.Double {
         private static long index = 0;
+        public boolean active = true;
         private long id = index++;
         private String name = "gameobject_" + id;
         public double dx, dy;
@@ -100,6 +100,9 @@ public class Platform2D implements KeyListener, ComponentListener {
         public boolean staticObject = false;
         public int priority = 1;
 
+        public int duration = -1;
+        public int life = 0;
+
         public GameObject(String name) {
             super();
             this.name = name;
@@ -108,6 +111,29 @@ public class Platform2D implements KeyListener, ComponentListener {
         public GameObject(String name, double x, double y, double w, double h) {
             super(x, y, w, h);
             this.name = name;
+        }
+
+        public GameObject setDuration(int d) {
+            this.duration = d;
+            return this;
+        }
+
+        public GameObject setPosition(double x, double y) {
+            this.x = x;
+            this.y = y;
+            return this;
+        }
+
+        public GameObject setVelocity(double dx, double dy) {
+            this.dx = dx;
+            this.dy = dy;
+            return this;
+        }
+
+        public GameObject setAcceleration(double ax, double ay) {
+            this.ax = ax;
+            this.ay = ay;
+            return this;
         }
 
         public long getId() {
@@ -120,7 +146,9 @@ public class Platform2D implements KeyListener, ComponentListener {
     }
 
     public static class TextObject extends GameObject {
+        public Color shadowColor = Color.BLACK;
         String text;
+        private Font font;
 
         public TextObject(String name) {
             super(name);
@@ -128,6 +156,11 @@ public class Platform2D implements KeyListener, ComponentListener {
 
         TextObject setText(String text) {
             this.text = text;
+            return this;
+        }
+
+        public TextObject setFont(Font font) {
+            this.font = font;
             return this;
         }
     }
@@ -194,13 +227,12 @@ public class Platform2D implements KeyListener, ComponentListener {
 
     private void initialize(String[] args) {
         loadConfiguration("/config.properties");
-
         buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
-
         frame = new JFrame(messages.getString("app.title"));
-        frame.setPreferredSize(screenSize);
-        frame.setMaximumSize(screenSize);
-        frame.setMinimumSize(screenSize);
+        setPreferredSize(screenSize);
+        setMaximumSize(screenSize);
+        setMinimumSize(screenSize);
+        frame.setContentPane(this);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.addComponentListener(this);
         frame.addKeyListener(this);
@@ -257,6 +289,17 @@ public class Platform2D implements KeyListener, ComponentListener {
         player.attributes.put("mana", 100);
         player.attributes.put("live", 3);
         addGameObject(player);
+
+        TextObject score = (TextObject) new TextObject("score")
+                .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+                .setText("000000")
+                .setPosition(10, 32);
+        score.fillColor = Color.WHITE;
+        score.borderColor = Color.BLACK;
+        score.shadowColor = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+        score.priority = 1;
+        score.staticObject = true;
+        addGameObject(score);
 
         // Add a constrain
         GameObject water = new GameObject("water",
@@ -342,7 +385,7 @@ public class Platform2D implements KeyListener, ComponentListener {
 
     private void update(double elapse) {
         objects.stream()
-                .filter(o -> !o.staticObject)
+                .filter(o -> !o.staticObject && o.active)
                 .sorted((a, b) -> Integer.compare(b.priority, a.priority))
                 .forEach(o -> {
                     // compute acceleration applied to the GameObject o
@@ -404,7 +447,14 @@ public class Platform2D implements KeyListener, ComponentListener {
                         }
                     }
                     o.forces.clear();
+                    if (o.duration != -1) {
+                        o.life += elapse;
+                        if (o.life > o.duration) {
+                            o.active = false;
+                        }
+                    }
                 });
+
     }
 
     private void draw() {
@@ -424,14 +474,25 @@ public class Platform2D implements KeyListener, ComponentListener {
                 }
                 case "TextObject" -> {
                     TextObject to = (TextObject) o;
-                    gb.setColor(o.fillColor);
-                    gb.drawString(to.text, (int) to.x, (int) to.y);
+                    if (to.text != null) {
+                        gb.setFont(to.font);
+                        for (int ix = -1; ix < 1; ix++) {
+                            for (int iy = -1; iy < 1; iy++) {
+                                gb.setColor(to.borderColor);
+                                gb.drawString(to.text, (int) to.x + ix, (int) to.y + iy);
+                            }
+                        }
+                        gb.setColor(to.shadowColor);
+                        gb.drawString(to.text, (int) to.x + 2, (int) to.y + 2);
+                        gb.setColor(to.fillColor);
+                        gb.drawString(to.text, (int) to.x, (int) to.y);
+                    }
                 }
                 default -> {
                     error("No renderering for %s", o.getClass().getSimpleName());
                 }
             }
-*});
+        });
         gb.dispose();
 
         // draw to screen.
