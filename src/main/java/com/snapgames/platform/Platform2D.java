@@ -484,6 +484,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void draw() {
         Graphics2D gb = buffer.createGraphics();
+        // set Antialiasing mode
+        gb.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        gb.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
         // clear buffer
         gb.setBackground(Color.BLACK);
         gb.clearRect(0, 0, 640, 400);
