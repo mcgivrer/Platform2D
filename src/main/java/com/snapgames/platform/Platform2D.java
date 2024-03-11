@@ -103,6 +103,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public int duration = -1;
         public int life = 0;
 
+        public GameObject() {
+            super();
+        }
+
         public GameObject(String name) {
             super();
             this.name = name;
