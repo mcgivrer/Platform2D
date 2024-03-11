@@ -150,6 +150,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * {@link TextObject} bring a new text capability to the {@link GameObject} to be displayed and managed.
+     * A bunch of new attributes :
+     * <ul>
+     *     <li>`text` supports {@link String} text,</li>
+     *     <li>`font` is defining the text font to used on rendering time,</li>
+     *     <li>`shadowColor` if exists will draw a slightly offset shadow behind the text.</li>
+     * </ul>
+     * <p>
+     * The existing `fillColor` is used to draw the text itself,
+     * and the `borderColor` is used to draw a border around the text.
+     */
     public static class TextObject extends GameObject {
         public Color shadowColor = Color.BLACK;
         String text;
