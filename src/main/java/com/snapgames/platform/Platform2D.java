@@ -414,59 +414,59 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         // add a player object
         GameObject player = new GameObject(
-            "player",
-            bufferSize.width >> 1, bufferSize.height >> 1,
-            16, 16)
-            .setMaterial(new Material("player", 1.0, 0.30, 0.92))
-            .addAttribute("energy", 100)
-            .addAttribute("mana", 100)
-            .addAttribute("lives", 3)
-            .setMass(80.0);
+                "player",
+                bufferSize.width >> 1, bufferSize.height >> 1,
+                16, 16)
+                .setMaterial(new Material("player", 1.0, 0.30, 0.92))
+                .addAttribute("energy", 100)
+                .addAttribute("mana", 100)
+                .addAttribute("lives", 3)
+                .setMass(80.0);
         addGameObject(player);
 
         TextObject score = (TextObject) new TextObject("score")
-            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
-            .setText("000000")
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(10, 32)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(1)
-            .setStaticObject(true);
+                .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+                .setText("000000")
+                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+                .setPosition(10, 32)
+                .setFillColor(Color.WHITE)
+                .setBorderColor(Color.BLACK)
+                .setPriority(1)
+                .setStaticObject(true);
         addGameObject(score);
 
         TextObject heart = (TextObject) new TextObject("heart")
-            .setFont(buffer.createGraphics().getFont().deriveFont(14.0f))
-            .setText("❤")
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(bufferSize.width - 40, 32)
-            .setFillColor(Color.RED)
-            .setBorderColor(Color.BLACK)
-            .setPriority(1)
-            .setStaticObject(true);
+                .setFont(buffer.createGraphics().getFont().deriveFont(14.0f))
+                .setText("❤")
+                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+                .setPosition(bufferSize.width - 40, 32)
+                .setFillColor(Color.RED)
+                .setBorderColor(Color.BLACK)
+                .setPriority(1)
+                .setStaticObject(true);
 
         TextObject lifes = (TextObject) new TextObject("lives")
-            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
-            .setText("" + (player.attributes.get("lives")))
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(bufferSize.width - 30, 32)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(2)
-            .setStaticObject(true);
+                .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+                .setText("" + (player.attributes.get("lives")))
+                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+                .setPosition(bufferSize.width - 30, 32)
+                .setFillColor(Color.WHITE)
+                .setBorderColor(Color.BLACK)
+                .setPriority(2)
+                .setStaticObject(true);
         addGameObject(heart);
         addGameObject(lifes);
 
         // Add some constraining object.
         ConstrainObject water = (ConstrainObject) new ConstrainObject("water",
-            0,
-            world.getPlayArea().getHeight() * 0.70,
-            world.getPlayArea().getWidth(),
-            world.getPlayArea().getHeight() * 0.30)
-            .setPriority(2)
-            .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
-            .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
-            .addForce(new Vec2d(0, -0.3));
+                0,
+                world.getPlayArea().getHeight() * 0.70,
+                world.getPlayArea().getWidth(),
+                world.getPlayArea().getHeight() * 0.30)
+                .setPriority(2)
+                .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
+                .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
+                .addForce(new Vec2d(0, -0.3));
         addGameObject(water);
 
         world.addConstrain(water);
@@ -480,16 +480,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         for (int i = 0; i < nbEnemies; i++) {
             // add a player object
             GameObject enemy = new GameObject(
-                "enemy_" + i,
-                Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                8, 8)
-                .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
-                .setFillColor(Color.BLUE)
-                .setBorderColor(Color.DARK_GRAY)
-                .addAttribute("energy", 100)
-                .addAttribute("mana", 100)
-                .setPriority(10 + i)
-                .setMass(10.0);
+                    "enemy_" + i,
+                    Math.random() * bufferSize.width, Math.random() * bufferSize.height,
+                    8, 8)
+                    .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
+                    .setFillColor(Color.BLUE)
+                    .setBorderColor(Color.DARK_GRAY)
+                    .addAttribute("energy", 100)
+                    .addAttribute("mana", 100)
+                    .setPriority(10 + i)
+                    .setMass(10.0);
             addGameObject(enemy);
         }
     }
@@ -499,9 +499,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         objectMap.put(gameObject.getName(), gameObject);
         // update statistics data
         long countActive = objects.stream()
-            .filter(GameObject::isActive).count();
+                .filter(GameObject::isActive).count();
         long countStatic = objects.stream()
-            .filter(GameObject::isObjectStatic).count();
+                .filter(GameObject::isObjectStatic).count();
         stats.put("3:active", countActive);
         stats.put("2:static", countStatic);
         stats.put("1:obj", objects.size());
@@ -544,16 +544,22 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 draw(stats);
 
             }
-            previous = currentTime;
+
+            // compute time to wait regarding elapsed minimal frame time
+            int wait = Math.max((int) ((1000 / FPS) - elapsed), 1);
             try {
-                Thread.sleep(1000 / FPS);
+                Thread.sleep(wait);
             } catch (InterruptedException e) {
-                error("Unable to sleep for 16ms%n");
+                error("Unable to sleep for %dms%n", wait);
             }
+
+            // prepare statical values
             stats.put("0:debug", debug);
             stats.put("4:fps", framesPerSec);
             stats.put("5:ups", updatesPerSec);
             stats.put("6:time", formatDuration(gameTime));
+
+            previous = currentTime;
 
         }
     }
@@ -582,39 +588,39 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void update(double elapse) {
         objects.stream()
-            .filter(o -> !o.staticObject && o.active)
-            .sorted((a, b) -> Integer.compare(b.priority, a.priority))
-            .forEach(o -> {
-                // compute acceleration applied to the GameObject o
-                o.ax = 0;
-                o.ay = 0;
+                .filter(o -> !o.staticObject && o.active)
+                .sorted((a, b) -> Integer.compare(b.priority, a.priority))
+                .forEach(o -> {
+                    // compute acceleration applied to the GameObject o
+                    o.ax = 0;
+                    o.ay = 0;
 
-                // apply world constrains
-                applyWorldConstrains(world, o, elapse);
+                    // apply world constrains
+                    applyWorldConstrains(world, o, elapse);
 
-                // add applied forces on acceleration
-                o.forces.forEach(v -> {
-                    o.ax += v.x;
-                    o.ay += v.y;
+                    // add applied forces on acceleration
+                    o.forces.forEach(v -> {
+                        o.ax += v.x;
+                        o.ay += v.y;
+                    });
+
+                    // compute resulting speed
+                    o.dx += (o.ax * elapse * PHYSIC_TIME_FACTOR);
+                    o.dy += (o.ay * elapse * PHYSIC_TIME_FACTOR);
+
+                    // get the GameObject o position
+                    o.x += o.dx * elapse;
+                    o.y += o.dy * elapse;
+
+                    // apply friction "force" to the velocity
+                    o.dx *= o.material.friction;
+                    o.dy *= o.material.friction;
+
+                    o.update(elapse);
+                    keepGameObjectIntoPlayArea(world, o);
+                    o.forces.clear();
+
                 });
-
-                // compute resulting speed
-                o.dx += (o.ax * elapse * PHYSIC_TIME_FACTOR);
-                o.dy += (o.ay * elapse * PHYSIC_TIME_FACTOR);
-
-                // get the GameObject o position
-                o.x += o.dx * elapse;
-                o.y += o.dy * elapse;
-
-                // apply friction "force" to the velocity
-                o.dx *= o.material.friction;
-                o.dy *= o.material.friction;
-
-                o.update(elapse);
-                keepGameObjectIntoPlayArea(world, o);
-                o.forces.clear();
-
-            });
 
     }
 
@@ -717,12 +723,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void displayToWindow(Map<String, Object> stats) {
         Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
         g.drawImage(buffer,
-            0, 0, screenSize.width, screenSize.height,
-            0, 0, bufferSize.width, bufferSize.height,
-            null);
+                0, 0, screenSize.width, screenSize.height,
+                0, 0, bufferSize.width, bufferSize.height,
+                null);
         g.setColor(Color.ORANGE);
         g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-            16, frame.getHeight() - 16);
+                16, frame.getHeight() - 16);
         g.dispose();
         frame.getBufferStrategy().show();
     }
@@ -762,8 +768,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                + ":"
-                + value;
+                    + ":"
+                    + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
@@ -827,24 +833,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                     for (Vec2d f : o.forces) {
                         gb.setColor(Color.WHITE);
                         gb.drawLine(
-                            (int) (o.x + (o.width * 0.5)),
-                            (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                     }
                     // draw velocity
                     gb.setColor(Color.GREEN);
                     gb.drawLine(
-                        (int) (o.x + (o.width * 0.5)),
-                        (int) (o.y + (o.height * 0.5)),
-                        (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                        (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                            (int) (o.x + (o.width * 0.5)),
+                            (int) (o.y + (o.height * 0.5)),
+                            (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                     // draw Acceleration
                     gb.setColor(Color.BLUE);
                     gb.drawLine((int) (o.x + (o.width * 0.5)),
-                        (int) (o.y + (o.height * 0.5)),
-                        (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                        (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                            (int) (o.y + (o.height * 0.5)),
+                            (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                 }
             }
             if (debug > 2) {
@@ -965,9 +971,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-            "Platform2D",
-            new Dimension(320, 200),
-            new Dimension(640, 400));
+                "Platform2D",
+                new Dimension(320, 200),
+                new Dimension(640, 400));
         platform2d.run(args);
     }
 }
