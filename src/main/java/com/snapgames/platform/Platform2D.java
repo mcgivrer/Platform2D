@@ -23,6 +23,7 @@ import javax.swing.*;
  */
 public class Platform2D extends JPanel implements KeyListener, ComponentListener {
     public static final int FPS = 60;
+    public static final double PHYSIC_TIME_FACTOR = 0.005;
 
     /**
      * The {@link Vec2d} class is a 2 dimensional vector.
@@ -100,8 +101,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public boolean staticObject = false;
         public int priority = 1;
 
-        public int duration = -1;
-        public int life = 0;
+        public double lifespan = -1;
+        public double timer = 0;
 
         public GameObject(String name) {
             super();
@@ -113,8 +114,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.name = name;
         }
 
-        public GameObject setDuration(int d) {
-            this.duration = d;
+        public GameObject setLifespan(int d) {
+            this.lifespan = d;
             return this;
         }
 
@@ -388,31 +389,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 .filter(o -> !o.staticObject && o.active)
                 .sorted((a, b) -> Integer.compare(b.priority, a.priority))
                 .forEach(o -> {
+                    applyWorldConstrains(world, o);
                     // compute acceleration applied to the GameObject o
                     o.ax = 0;
                     o.ay = 0;
-
-                    // apply gravity
-                    o.forces.add(world.getGravity());
-
                     // compute resulting acceleration
-                    for (Vec2d v : o.forces) {
+                    o.forces.forEach(v -> {
                         o.ax += v.x;
                         o.ay += v.y;
-                    }
+                    });
 
-                    // if o is under some world constrain
-                    for (GameObject c : world.constrains) {
-                        if (c.contains(o)) {
-                            for (Vec2d v : c.forces) {
-                                o.ax += v.x;
-                                o.ay += v.y;
-                            }
-                        }
-                    }
                     // compute resulting speed
-                    o.dx = o.dx + o.ax * elapse * 0.005;
-                    o.dy = o.dy + o.ay * elapse * 0.005;
+                    o.dx += (o.ax * elapse * PHYSIC_TIME_FACTOR);
+                    o.dy += (o.ay * elapse * PHYSIC_TIME_FACTOR);
 
                     // get the GameObject o position
                     o.x += o.dx * elapse;
@@ -422,39 +411,59 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                     o.dx *= o.material.friction;
                     o.dy *= o.material.friction;
 
-                    // Constrains the Gameobject o into the play area.
-                    Rectangle2D playArea = world.getPlayArea();
-                    if (playArea.intersects(o) || !playArea.contains(o)) {
-                        if (o.x < 0) {
-                            o.x = 0;
-                            o.dx *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.x > playArea.getWidth() - o.width) {
-                            o.x = playArea.getWidth() - o.width;
-                            o.dx *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.y < 0) {
-                            o.y = 0;
-                            o.dy *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                        if (o.y > playArea.getHeight() - o.width) {
-                            o.y = playArea.getHeight() - o.height;
-                            o.dy *= -o.material.elasticity;
-                            o.contact = true;
-                        }
-                    }
-                    o.forces.clear();
-                    if (o.duration != -1) {
-                        o.life += elapse;
-                        if (o.life > o.duration) {
+                    // Compute lifespan & Duration.
+                    if (o.lifespan != -1) {
+                        o.timer += elapse;
+                        if (o.timer > o.lifespan) {
                             o.active = false;
                         }
                     }
+                    keepGameObjectIntoPlayArea(world, o);
+                    o.forces.clear();
+
                 });
 
+    }
+
+    private void keepGameObjectIntoPlayArea(World world, GameObject o) {
+        // Constrains the Gameobject o into the play area.
+        Rectangle2D playArea = world.getPlayArea();
+        if (playArea.intersects(o) || !playArea.contains(o)) {
+            if (o.x < 0) {
+                o.x = 0;
+                o.dx *= -o.material.elasticity;
+                o.contact = true;
+            }
+            if (o.x > playArea.getWidth() - o.width) {
+                o.x = playArea.getWidth() - o.width;
+                o.dx *= -o.material.elasticity;
+                o.contact = true;
+            }
+            if (o.y < 0) {
+                o.y = 0;
+                o.dy *= -o.material.elasticity;
+                o.contact = true;
+            }
+            if (o.y > playArea.getHeight() - o.width) {
+                o.y = playArea.getHeight() - o.height;
+                o.dy *= -o.material.elasticity;
+                o.contact = true;
+            }
+        }
+    }
+
+    private void applyWorldConstrains(World world, GameObject go) {
+        // apply gravity
+        go.forces.add(world.getGravity());
+        // if o is under some world constrain
+        for (GameObject c : world.constrains) {
+            if (c.contains(go)) {
+                for (Vec2d v : c.forces) {
+                    go.ax += v.x;
+                    go.ay += v.y;
+                }
+            }
+        }
     }
 
     private void draw() {
@@ -570,7 +579,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         log("WARN", message, args);
     }
 
-    public static void log(String level, String message, Object... args) {
+    private static void log(String level, String message, Object... args) {
         String date = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now());
         System.out.printf(date + "|" + level.toUpperCase() + "|" + message + "%n", args);
     }
