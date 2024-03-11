@@ -1,5 +1,6 @@
 package com.snapgames.platform;
 
+import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
@@ -13,8 +14,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 
-import javax.swing.*;
-
 /**
  * The {@link Platform2D} class base of the platform framework.
  *
@@ -24,6 +23,7 @@ import javax.swing.*;
 public class Platform2D extends JPanel implements KeyListener, ComponentListener {
     public static final int FPS = 60;
     public static final double PHYSIC_TIME_FACTOR = 0.005;
+    private int debug = 0;
 
     /**
      * The {@link Vec2d} class is a 2 dimensional vector.
@@ -148,6 +148,41 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public String getName() {
             return name;
         }
+
+        public GameObject setFillColor(Color fill) {
+            this.fillColor = fill;
+            return this;
+        }
+
+        public GameObject setBorderColor(Color border) {
+            this.borderColor = border;
+            return this;
+        }
+
+        public GameObject setPriority(int p) {
+            this.priority = p;
+            return this;
+        }
+
+        public GameObject setStaticObject(boolean staticObject) {
+            this.staticObject = staticObject;
+            return this;
+        }
+
+        public GameObject addForce(Vec2d f) {
+            forces.add(f);
+            return this;
+        }
+
+        public GameObject setMaterial(Material m) {
+            this.material = m;
+            return this;
+        }
+
+        public GameObject addAttribute(String attrName, Object attrValue) {
+            attributes.put(attrName, attrValue);
+            return this;
+        }
     }
 
     /**
@@ -180,8 +215,20 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.font = font;
             return this;
         }
+
+        public GameObject setShadowColor(Color shadow) {
+            this.shadowColor = shadow;
+            return this;
+        }
     }
 
+    /**
+     * The `{@link ConstrainObject}` is a specific object bringing physical contains into the {@link World},
+     * to let influence existing other {@link GameObject} and inheritance with constrained forces.
+     *
+     * @author Frédéric Delorme
+     * @since 1.0.0
+     */
     public static class ConstrainObject extends GameObject {
 
         public ConstrainObject(String name) {
@@ -319,24 +366,59 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         GameObject player = new GameObject(
             "player",
             bufferSize.width >> 1, bufferSize.height >> 1,
-            16, 16);
-        player.material = new Material("player", 1.0, 0.30, 0.92);
-        player.attributes.put("energy", 100);
-        player.attributes.put("mana", 100);
-        player.attributes.put("live", 3);
+            16, 16)
+            .setMaterial(new Material("player", 1.0, 0.30, 0.92))
+            .addAttribute("energy", 100)
+            .addAttribute("mana", 100)
+            .addAttribute("lives", 3);
         addGameObject(player);
 
-        // Add a constrain
-        GameObject water = new GameObject("water",
-            0, world.getPlayArea().getHeight() * 0.70,
+        TextObject score = (TextObject) new TextObject("score")
+            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+            .setText("000000")
+            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+            .setPosition(10, 32)
+            .setFillColor(Color.WHITE)
+            .setBorderColor(Color.BLACK)
+            .setPriority(1)
+            .setStaticObject(true);
+        addGameObject(score);
+
+        TextObject heart = (TextObject) new TextObject("heart")
+            .setFont(buffer.createGraphics().getFont().deriveFont(14.0f))
+            .setText("❤")
+            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+            .setPosition(bufferSize.width - 40, 32)
+            .setFillColor(Color.RED)
+            .setBorderColor(Color.BLACK)
+            .setPriority(1)
+            .setStaticObject(true);
+
+        TextObject lifes = (TextObject) new TextObject("lives")
+            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+            .setText("" + (player.attributes.get("lives")))
+            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+            .setPosition(bufferSize.width - 30, 32)
+            .setFillColor(Color.WHITE)
+            .setBorderColor(Color.BLACK)
+            .setPriority(2)
+            .setStaticObject(true);
+        addGameObject(heart);
+        addGameObject(lifes);
+
+        // Add some constraining object.
+        ConstrainObject water = (ConstrainObject) new ConstrainObject("water",
+            0,
+            world.getPlayArea().getHeight() * 0.70,
             world.getPlayArea().getWidth(),
-            world.getPlayArea().getHeight() * 0.30);
-        water.priority = 2;
-        water.fillColor = new Color(0.2f, 0.2f, 0.7f, 0.4f);
-        water.borderColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
-        water.forces.add(new Vec2d(0, -0.5));
-        world.constrains.add(water);
+            world.getPlayArea().getHeight() * 0.30)
+            .setPriority(2)
+            .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
+            .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
+            .addForce(new Vec2d(0, -0.5));
         addGameObject(water);
+
+        world.addConstrain(water);
 
         // add some enemies
         for (int i = 0; i < 10; i++) {
@@ -344,13 +426,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             GameObject enemy = new GameObject(
                 "enemy_" + i,
                 Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                8, 8);
-            enemy.material = new Material("enemy", 0.7, 0.80, 0.99);
-            enemy.fillColor = Color.BLUE;
-            enemy.borderColor = Color.DARK_GRAY;
-            enemy.attributes.put("energy", 100);
-            enemy.attributes.put("mana", 100);
-            enemy.priority = 10 + i;
+                8, 8)
+                .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
+                .setFillColor(Color.BLUE)
+                .setBorderColor(Color.DARK_GRAY)
+                .addAttribute("energy", 100)
+                .addAttribute("mana", 100)
+                .setPriority(10 + i);
             addGameObject(enemy);
         }
 
@@ -472,6 +554,20 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 o.y = playArea.getHeight() - o.height;
                 o.dy *= -o.material.elasticity;
                 o.contact = true;
+            }
+        }
+    }
+
+    private void applyWorldConstrains(World world, GameObject go) {
+        // apply gravity
+        go.forces.add(world.getGravity());
+        // if o is under some world constrain
+        for (GameObject c : world.constrains) {
+            if (c.contains(go)) {
+                for (Vec2d v : c.forces) {
+                    go.ax += v.x;
+                    go.ay += v.y;
+                }
             }
         }
     }

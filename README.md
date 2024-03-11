@@ -3,11 +3,11 @@
 ## Context
 
 This Platform2D class is an optimized mono class 2D platform game framework bringing all the required basic features to
-implement a very simple java game.
+implement a basic java game.
 
 ## Build
 
-This project is free of any build tools but Java and Javac ! :)
+This project is free of any build tools but `java` and `javac`! :)
 A simple `build.sh` script is used to build java code, create a jar and an auto-runnable linux compatible script.
 
 ```bash
@@ -40,15 +40,15 @@ target/build/platform2d-1.0.0.run
 
 ## Contribute
 
-If you want to bring your own knowledge, you can fork this repositotry and create some pull request proposal to add new
+If you want to bring your own knowledge, you can fork this repository and create some pull request proposals to add new
 features or refactor things ;)
 
 Keep in mind that this code required to be simple, compact and less than 3000 lines :)
 
 ## License
 
-This code is licensed through the well known MIT license.
+This code is licensed through the well-known MIT license.
 
-That's all folk !
+That's all folk!
 
 McG.
