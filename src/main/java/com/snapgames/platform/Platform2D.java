@@ -162,6 +162,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public double lifespan = -1;
         public double timer = 0;
 
+        public double debugOffsetY = 0;
+
         public GameObject() {
             super();
         }
@@ -264,6 +266,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public boolean isObjectStatic() {
             return staticObject;
         }
+
+        public List<String> toDebugString() {
+            List<String> dbgInfo = new ArrayList<>();
+            dbgInfo.add(String.format("0_id:%d", getId()));
+            dbgInfo.add("1_name:" + getName());
+            dbgInfo.add(String.format("2_pos:(%.01f,%.01f)", x, y));
+            dbgInfo.add(String.format("2_vel:(%.01f,%.01f)", dx, dy));
+            dbgInfo.add(String.format("2_acc:(%.01f,%.01f)", dx, dy));
+            return dbgInfo;
+        }
+
+        protected GameObject setDebugOffsetY(int offY) {
+            this.debugOffsetY = offY;
+            return this;
+        }
     }
 
     /**
@@ -285,6 +302,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         public TextObject(String name) {
             super(name);
+            super.setDebugOffsetY(8);
         }
 
         TextObject setText(String text) {
@@ -1013,52 +1031,48 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void drawDebugInfo(GameObject o, Graphics2D gb) {
         if (Optional.ofNullable(debugFilter).isPresent()
             && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
-            
-            int offy = 0;
             if (debug > 0) {
                 gb.setColor(Color.ORANGE);
                 gb.setFont(gb.getFont().deriveFont(9.0f));
-                if (o.getClass().getSimpleName().equals("TextObject")) {
-                    offy = 8;
+                int line = 0;
+                for (String item : o.toDebugString()) {
+                    int level = Integer.parseInt(item.contains("_") ? item.substring(0, item.indexOf("_")) : "0");
+                    if (debug > level) {
+                        String into = item.substring(item.indexOf("_") + 1);
+                        gb.drawString(item, (int) (o.x + o.width + 4), (int) (o.y + o.debugOffsetY + (line++ * 9)));
+                    }
                 }
-                gb.drawString("#" + o.getId(), (int) (o.x + o.width + 4), (int) (o.y) + offy);
-            }
-            if (debug > 1) {
-                // draw bounding box
-                gb.setColor(Color.ORANGE);
-                gb.draw(o);
-                if (!o.staticObject) {
-                    // show all applied forces
-                    for (Vec2d f : o.forces) {
-                        gb.setColor(Color.WHITE);
+                if (debug > 1) {
+                    // draw bounding box
+                    gb.setColor(Color.ORANGE);
+                    gb.draw(o);
+                    if (!o.staticObject) {
+                        // show all applied forces
+                        for (Vec2d f : o.forces) {
+                            gb.setColor(Color.WHITE);
+                            gb.drawLine(
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                        }
+                        // draw velocity
+                        gb.setColor(Color.GREEN);
                         gb.drawLine(
                             (int) (o.x + (o.width * 0.5)),
                             (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                            (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                        // draw Acceleration
+                        gb.setColor(Color.BLUE);
+                        gb.drawLine((int) (o.x + (o.width * 0.5)),
+                            (int) (o.y + (o.height * 0.5)),
+                            (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                     }
-                    // draw velocity
-                    gb.setColor(Color.GREEN);
-                    gb.drawLine(
-                        (int) (o.x + (o.width * 0.5)),
-                        (int) (o.y + (o.height * 0.5)),
-                        (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                        (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
-                    // draw Acceleration
-                    gb.setColor(Color.BLUE);
-                    gb.drawLine((int) (o.x + (o.width * 0.5)),
-                        (int) (o.y + (o.height * 0.5)),
-                        (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                        (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                 }
             }
-            if (debug > 2) {
-                gb.setColor(Color.ORANGE);
-                if (o.getClass().getSimpleName().equals("TextObject")) {
-                    offy = 8;
-                }
-                gb.drawString(o.name, (int) (o.x + o.width + 4), (int) (o.y) + offy + 8);
-            }
+
         }
     }
 
