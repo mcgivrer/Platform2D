@@ -1011,7 +1011,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param gb the {@link Graphics2D} API instance to be used.
      */
     private void drawDebugInfo(GameObject o, Graphics2D gb) {
-        if (Optional.ofNullable(debugFilter).isPresent() && debugFilter.contains(o.name)) {
+        if (Optional.ofNullable(debugFilter).isPresent()
+            && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
+            
             int offy = 0;
             if (debug > 0) {
                 gb.setColor(Color.ORANGE);
