@@ -62,7 +62,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * Physic engine computation time reduction factor to a slightly decelerated world.
      */
     public static final double PHYSIC_TIME_FACTOR = 0.005;
-    private static Map<String, Object> resources = new LinkedHashMap<>(20, 0.80f);
+    private static final Map<String, Object> resources = new LinkedHashMap<>(20, 0.80f);
     /**
      * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
      */
@@ -684,6 +684,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @return the corresponding object resource.
      */
     private static Object getResource(String path) {
+        Object resource = null;
         if (!resources.containsKey(path)) {
             String ext = "";
             if (path.contains("|")) {
@@ -697,7 +698,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
                 default -> {
                     error("Unknown file extension %s", ext);
-                    return null;
                 }
             }
         }
