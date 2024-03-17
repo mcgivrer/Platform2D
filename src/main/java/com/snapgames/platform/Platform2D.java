@@ -1038,6 +1038,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         gb.translate(-camera.x, -camera.y);
         drawAllEntity(gb, false);
+
+        if (debug > 1) {
+            gb.setColor(Color.YELLOW);
+            gb.draw(world.getPlayArea());
+        }
+
         gb.translate(camera.x, camera.y);
         drawAllEntity(gb, true);
 
