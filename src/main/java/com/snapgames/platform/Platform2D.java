@@ -86,6 +86,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
 
+    public void setWorld(World world) {
+        this.world = world;
+    }
+
     /**
      * The {@link Vec2d} class is a 2-dimension vector.
      *
@@ -948,7 +952,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      *
      * @param elapsed
      */
-    private void update(double elapsed) {
+    void update(double elapsed) {
         objects.stream()
             // process only active and non-static objects
             .filter(o -> !o.staticObject && o.active)
