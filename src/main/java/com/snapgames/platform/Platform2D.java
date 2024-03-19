@@ -10,8 +10,10 @@ import java.awt.event.KeyListener;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,12 +68,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     /**
      * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
      */
-    private int debug = 0;
+    int debug = 0;
     /**
      * filtering the visual debug information screen by listing (coma separated)
      * in the filter the targeted object's names.
      */
-    private String debugFilter = null;
+    String debugFilter = null;
 
     /**
      * Flag to activate/deactivate drawing operation in the game loop.
@@ -82,6 +84,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private boolean updateFlag = true;
     private String configurationFilePath = "/config.properties";
+    private boolean testMode = false;
 
     /**
      * The {@link Vec2d} class is a 2-dimension vector.
@@ -459,14 +462,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                    * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                    * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                    this.viewport.getHeight());
+                this.viewport.getHeight());
 
         }
     }
@@ -516,11 +519,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     /**
      * Internal list of  Scene's {@link GameObject}.
      */
-    private final List<GameObject> objects = new CopyOnWriteArrayList<>();
+    final List<GameObject> objects = new CopyOnWriteArrayList<>();
     /**
      * Internal Map of Scene {@link GameObject} for simplify of instance access
      */
-    private final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
+    final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
 
     /**
      * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
@@ -549,13 +552,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         this.screenSize = screenSize;
     }
 
+    public Platform2D(String name) {
+        this(name, null, null);
+    }
+
     /**
      * Initialization of everything based on the configuration file (here is <code>config.properties</code>)
      * and the java CLI arguments.
      *
      * @param args the java CLI arguments.
      */
-    private void initialize(String[] args) {
+    void initialize(String[] args) {
+        intializeDefaultConfiguration();
         parseArguments(args);
         loadConfiguration(configurationFilePath);
         buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
@@ -568,10 +576,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         frame.addComponentListener(this);
         frame.addKeyListener(this);
         frame.pack();
-        frame.setVisible(true);
+        if (!testMode) {
+            frame.setVisible(true);
+        }
         frame.createBufferStrategy(3);
 
         createScene();
+    }
+
+    private void intializeDefaultConfiguration() {
+        config.put("app.debug.level", "0");
+        config.put("app.debug.filter", "");
+        config.put("app.screen.size", "320x200");
+        config.put("app.window.size", "640x400");
     }
 
 
@@ -596,8 +613,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(String[] args) {
         Map<String, Object> attributes = Arrays.stream(args)
-                .map(s -> s.split("="))
-                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+            .map(s -> s.split("="))
+            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
 
         parseAttributes(attributes);
     }
@@ -609,7 +626,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(Properties props) {
         Map<String, Object> attributes = props.entrySet().stream()
-                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
         parseAttributes(attributes);
     }
 
@@ -620,24 +637,29 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param attributes the map of (key,value) to feed the configuration.
      */
     private void parseAttributes(Map<String, Object> attributes) {
-        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
+        if (attributes.size() > 0) {
+            for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
 // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
-            switch (key) {
-                case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
-                case "app.screen.size", "buffer", "b" -> {
-                    String[] values = ((String) value).split("x");
-                    bufferSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
+                switch (key) {
+                    case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
+                    case "app.screen.size", "buffer", "b" -> {
+                        String[] values = ((String) value).split("x");
+                        bufferSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
+                    }
+                    case "app.window.size", "window", "w" -> {
+                        String[] values = ((String) value).split("x");
+                        screenSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
+                    }
+                    case "app.debug.level", "debug", "d" -> debug = Integer.parseInt((String) value);
+                    case "app.debug.filter", "filter", "df" -> debugFilter = (String) value;
+                    case "app.test.mode" -> this.testMode = Boolean.parseBoolean((String) value);
+                    default -> warn("Value entry unknown %s=%s", key, value);
                 }
-                case "app.window.size", "window", "w" -> {
-                    String[] values = ((String) value).split("x");
-                    screenSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
-                }
-                case "app.debug.level", "debug", "d" -> debug = Integer.parseInt((String) value);
-                case "app.debug.filter", "filter", "df" -> debugFilter = (String) value;
-                default -> warn("Value entry unknown %s=%s", key, value);
             }
+        } else {
+            error("Configuration file %s is empty", configurationFilePath);
         }
     }
 
@@ -647,36 +669,36 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
         ImageObject background = (ImageObject) new ImageObject("background")
-                .setImage(backgroundImg)
-                .setStaticObject(true)
-                .setPriority(-10);
+            .setImage(backgroundImg)
+            .setStaticObject(true)
+            .setPriority(-10);
         addGameObject(background);
 
 
         // add a player object
         GameObject player = new GameObject(
-                "player",
-                bufferSize.width >> 1, bufferSize.height >> 1,
-                16, 16)
-                .setMaterial(new Material("player", 1.0, 0.30, 0.92))
-                .addAttribute("energy", 100)
-                .addAttribute("mana", 100)
-                .addAttribute("lives", 3)
-                .setMass(80.0);
+            "player",
+            bufferSize.width >> 1, bufferSize.height >> 1,
+            16, 16)
+            .setMaterial(new Material("player", 1.0, 0.30, 0.92))
+            .addAttribute("energy", 100)
+            .addAttribute("mana", 100)
+            .addAttribute("lives", 3)
+            .setMass(80.0);
         addGameObject(player);
 
         createHUD(player);
 
         // Add some constraining object.
         ConstraintObject water = (ConstraintObject) new ConstraintObject("water",
-                0,
-                world.getPlayArea().getHeight() * 0.70,
-                world.getPlayArea().getWidth(),
-                world.getPlayArea().getHeight() * 0.30)
-                .setPriority(2)
-                .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
-                .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
-                .addForce(new Vec2d(0, -0.3));
+            0,
+            world.getPlayArea().getHeight() * 0.70,
+            world.getPlayArea().getWidth(),
+            world.getPlayArea().getHeight() * 0.30)
+            .setPriority(2)
+            .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
+            .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
+            .addForce(new Vec2d(0, -0.3));
         addGameObject(water);
 
         world.addConstrain(water);
@@ -685,9 +707,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         addEnemies(10);
 
         setCamera(new Camera("cam01")
-                .setTarget(player)
-                .setTweenFactor(0.05)
-                .setViewport(new Rectangle2D.Double(0, 0, bufferSize.getWidth(), bufferSize.getHeight())));
+            .setTarget(player)
+            .setTweenFactor(0.05)
+            .setViewport(new Rectangle2D.Double(0, 0, bufferSize.getWidth(), bufferSize.getHeight())));
 
     }
 
@@ -697,35 +719,35 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void createHUD(GameObject player) {
         TextObject score = (TextObject) new TextObject("score")
-                .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
-                .setText("000000")
-                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-                .setPosition(8, 16)
-                .setFillColor(Color.WHITE)
-                .setBorderColor(Color.BLACK)
-                .setPriority(1)
-                .setStaticObject(true)
-                .setStickToCamera(true);
+            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+            .setText("000000")
+            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+            .setPosition(8, 16)
+            .setFillColor(Color.WHITE)
+            .setBorderColor(Color.BLACK)
+            .setPriority(1)
+            .setStaticObject(true)
+            .setStickToCamera(true);
         addGameObject(score);
 
         BufferedImage heartImage = ((BufferedImage) getResource("/assets/images/tiles01.png|0,96,16,16"));
         ImageObject heart = (ImageObject) new ImageObject("heart")
-                .setImage(heartImage)
-                .setPosition(bufferSize.width - 32, 16)
-                .setPriority(1)
-                .setStaticObject(true)
-                .setStickToCamera(true);
+            .setImage(heartImage)
+            .setPosition(bufferSize.width - 32, 16)
+            .setPriority(1)
+            .setStaticObject(true)
+            .setStickToCamera(true);
 
         TextObject lifes = (TextObject) new TextObject("lives")
-                .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
-                .setText("" + (player.attributes.get("lives")))
-                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-                .setPosition(bufferSize.width - 24, 20)
-                .setFillColor(Color.WHITE)
-                .setBorderColor(Color.BLACK)
-                .setPriority(2)
-                .setStaticObject(true)
-                .setStickToCamera(true);
+            .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
+            .setText("" + (player.attributes.get("lives")))
+            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+            .setPosition(bufferSize.width - 24, 20)
+            .setFillColor(Color.WHITE)
+            .setBorderColor(Color.BLACK)
+            .setPriority(2)
+            .setStaticObject(true)
+            .setStickToCamera(true);
         addGameObject(heart);
         addGameObject(lifes);
     }
@@ -751,7 +773,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param path file path to the resources to be retrieved/loaded.
      * @return the corresponding object resource.
      */
-    private static Object getResource(String path) {
+    static Object getResource(String path) {
         Object resource = null;
         if (!resources.containsKey(path)) {
             String ext = "";
@@ -796,21 +818,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         for (int i = 0; i < nbEnemies; i++) {
             // add a player object
             GameObject enemy = new GameObject(
-                    "enemy_" + i,
-                    Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                    8, 8)
-                    .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
-                    .setFillColor(Color.BLUE)
-                    .setBorderColor(Color.DARK_GRAY)
-                    .addAttribute("energy", 100)
-                    .addAttribute("mana", 100)
-                    .setPriority(10 + i)
-                    .setMass(10.0);
+                "enemy_" + i,
+                Math.random() * bufferSize.width, Math.random() * bufferSize.height,
+                8, 8)
+                .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
+                .setFillColor(Color.BLUE)
+                .setBorderColor(Color.DARK_GRAY)
+                .addAttribute("energy", 100)
+                .addAttribute("mana", 100)
+                .setPriority(10 + i)
+                .setMass(10.0);
             addGameObject(enemy);
         }
     }
 
-    private void addGameObject(GameObject gameObject) {
+    void addGameObject(GameObject gameObject) {
         objects.add(gameObject);
         objectMap.put(gameObject.getName(), gameObject);
         // update statistics data
@@ -875,16 +897,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-            Map<String, Object> stats,
-            long framesPerSec,
-            long updatesPerSec,
-            long gameTime,
-            double elapsed) {
+        Map<String, Object> stats,
+        long framesPerSec,
+        long updatesPerSec,
+        long gameTime,
+        double elapsed) {
 
         long countActive = objects.stream()
-                .filter(GameObject::isActive).count();
+            .filter(GameObject::isActive).count();
         long countStatic = objects.stream()
-                .filter(GameObject::isObjectStatic).count();
+            .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -928,39 +950,39 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void update(double elapsed) {
         objects.stream()
-                // process only active and non-static objects
-                .filter(o -> !o.staticObject && o.active)
-                .forEach(o -> {
-                    // reset current GameObject acceleration
-                    o.ax = 0;
-                    o.ay = 0;
+            // process only active and non-static objects
+            .filter(o -> !o.staticObject && o.active)
+            .forEach(o -> {
+                // reset current GameObject acceleration
+                o.ax = 0;
+                o.ay = 0;
 
-                    // apply all concerned World constraints
-                    applyWorldConstraints(world, o, elapsed);
+                // apply all concerned World constraints
+                applyWorldConstraints(world, o, elapsed);
 
-                    // add applied forces on acceleration
-                    o.forces.forEach(v -> {
-                        o.ax += v.x;
-                        o.ay += v.y;
-                    });
-
-                    // compute resulting speed
-                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                    // get the GameObject o position
-                    o.x += o.dx * elapsed;
-                    o.y += o.dy * elapsed;
-
-                    // apply friction "force" to the velocity
-                    o.dx *= o.material.friction;
-                    o.dy *= o.material.friction;
-
-                    o.update(elapsed);
-                    keepGameObjectIntoPlayArea(world, o);
-                    o.forces.clear();
-
+                // add applied forces on acceleration
+                o.forces.forEach(v -> {
+                    o.ax += v.x;
+                    o.ay += v.y;
                 });
+
+                // compute resulting speed
+                o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+                o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+                // get the GameObject o position
+                o.x += o.dx * elapsed;
+                o.y += o.dy * elapsed;
+
+                // apply friction "force" to the velocity
+                o.dx *= o.material.friction;
+                o.dy *= o.material.friction;
+
+                o.update(elapsed);
+                keepGameObjectIntoPlayArea(world, o);
+                o.forces.clear();
+
+            });
         if (Optional.ofNullable(camera).isPresent()) {
             camera.update(elapsed);
         }
@@ -1050,12 +1072,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
         objects.stream()
-                .filter(GameObject::isActive)
-                .filter(o -> o.getStickToCamera() == stickToCamera)
-                .forEach(o -> {
-                    drawGameObject(gb, o);
-                    drawDebugInfo(o, gb);
-                });
+            .filter(GameObject::isActive)
+            .filter(o -> o.getStickToCamera() == stickToCamera)
+            .forEach(o -> {
+                drawGameObject(gb, o);
+                drawDebugInfo(o, gb);
+            });
     }
 
     private void drawGameObject(Graphics2D gb, GameObject o) {
@@ -1108,12 +1130,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void displayToWindow(Map<String, Object> stats) {
         Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
         g.drawImage(buffer,
-                0, 0, screenSize.width, screenSize.height,
-                0, 0, bufferSize.width, bufferSize.height,
-                null);
+            0, 0, screenSize.width, screenSize.height,
+            0, 0, bufferSize.width, bufferSize.height,
+            null);
         g.setColor(Color.ORANGE);
         g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-                16, frame.getHeight() - 16);
+            16, frame.getHeight() - 16);
         g.dispose();
         frame.getBufferStrategy().show();
     }
@@ -1154,57 +1176,34 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                    + ":"
-                    + value;
+                + ":"
+                + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
     /**
      * Convert a long duration value to a formatted String value "D hh:mm:ss.SSS".
      *
-     * @param duration in ms
+     * @param milliseconds in ms
      * @return formatted String "%d d - %02d:%02d:%02d.%03d"
      */
-    public static String formatDuration(long duration, boolean withMS) {
-        int ms, s, m, h, d;
-        double dec;
-        double time = duration * 1.0;
-
-        time = (time / 1000.0);
-        dec = time % 1;
-        time = time - dec;
-        ms = (int) (dec * 1000.0);
-
-        time = (time / 60.0);
-        dec = time % 1;
-        time = time - dec;
-        s = (int) (dec * 60.0);
-
-        time = (time / 60.0);
-        dec = time % 1;
-        time = time - dec;
-        m = (int) (dec * 60.0);
-
-        time = (time / 24.0);
-        dec = time % 1;
-        time = time - dec;
-        h = (int) (dec * 24.0);
-
-        d = (int) time;
-        if (d > 0) {
-            if (withMS) {
-                return (String.format("%d d - %02d:%02d:%02d.%03d", d, h, m, s, ms));
-            } else {
-                return (String.format("%d d - %02d:%02d:%02d", d, h, m, s));
-            }
+    public static String formatDuration(long milliseconds, boolean withMS) {
+        Duration duration = Duration.ofMillis(milliseconds);
+        if (duration.toDays() > 0) {
+            return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
+                duration.toDays(),
+                duration.toHours() - (24 * duration.toDays()),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
         } else {
-            if (withMS) {
-                return (String.format("%02d:%02d:%02d.%03d", h, m, s, ms));
-            } else {
-                return (String.format("%02d:%02d:%02d", h, m, s));
-            }
-        }
+            return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
+                duration.toHours(),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
 
+        }
     }
 
     /**
@@ -1215,7 +1214,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void drawDebugInfo(GameObject o, Graphics2D gb) {
         if (Optional.ofNullable(debugFilter).isPresent()
-                && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
+            && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
             if (debug > 0) {
                 gb.setColor(Color.ORANGE);
                 gb.setFont(gb.getFont().deriveFont(9.0f));
@@ -1236,24 +1235,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                         for (Vec2d f : o.forces) {
                             gb.setColor(Color.WHITE);
                             gb.drawLine(
-                                    (int) (o.x + (o.width * 0.5)),
-                                    (int) (o.y + (o.height * 0.5)),
-                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                         }
                         // draw velocity
                         gb.setColor(Color.GREEN);
                         gb.drawLine(
-                                (int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                            (int) (o.x + (o.width * 0.5)),
+                            (int) (o.y + (o.height * 0.5)),
+                            (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                         // draw Acceleration
                         gb.setColor(Color.BLUE);
                         gb.drawLine((int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                            (int) (o.y + (o.height * 0.5)),
+                            (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                            (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                     }
                 }
             }
@@ -1264,8 +1263,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     /**
      * free all created/loaded resources.
      */
-    private void dispose() {
-        frame.dispose();
+    void dispose() {
+        if (Optional.ofNullable(frame).isPresent()) {
+            frame.dispose();
+        }
     }
 
     /**
@@ -1380,9 +1381,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-                "Platform2D",
-                new Dimension(320, 200),
-                new Dimension(640, 400));
+            "Platform2D",
+            new Dimension(320, 200),
+            new Dimension(640, 400));
         platform2d.run(args);
     }
 }
