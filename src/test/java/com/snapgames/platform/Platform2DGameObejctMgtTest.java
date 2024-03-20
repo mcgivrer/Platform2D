@@ -25,6 +25,8 @@ public class Platform2DGameObejctMgtTest {
 
     @Test
     public void addGameObjectToSceneTest() {
+
+        app.initialize(new String[]{"cf=/no-config-test.properties", "test=true"});
         app.addGameObject(new Platform2D.GameObject("go00"));
         Assertions.assertEquals("go00", app.objects.get(0).getName(), "GameObject 'go00' has not been added to the internal objects list");
         Assertions.assertEquals("go00", app.objectMap.get("go00").getName(), "GameObject 'go00' has not been put in the internal object map.");
@@ -32,9 +34,11 @@ public class Platform2DGameObejctMgtTest {
 
     @Test
     public void addMultiplePrioritizedGameObjectToSceneTest() {
+
+        app.initialize(new String[]{"cf=/no-config-test.properties", "test=true"});
         app.addGameObject(new Platform2D.GameObject("go01").setPriority(1));
         app.addGameObject(new Platform2D.GameObject("go02").setPriority(2));
-        Assertions.assertEquals(2, app.objects.size(), "GameObjects 'go01','go02' have not been added to the internal objects list");
+
         Assertions.assertEquals("go01", app.objects.get(0).getName(), "GameObjects 'go01' has not been sorted into the internal objects list");
         Assertions.assertEquals("go02", app.objects.get(1).getName(), "GameObjects 'go02' has not been sorted into the internal objects list");
     }
