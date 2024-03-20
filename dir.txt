@@ -1,0 +1,15 @@
+./target
+└─ classes
+   └─ com
+      └─ snapgames
+         └─ platform
+         │   └─ Platform2D$ConstraintObject.class
+         │   └─ Platform2D$GameObject.class
+         │   └─ Platform2D$ImageObject.class
+         │   └─ Platform2D$Material.class
+         │   └─ Platform2D$TextObject.class
+         │   └─ Platform2D$Vec2d.class
+         │   └─ Platform2D$World.class
+             └─ Platform2D.class
+
+4 directories, 8 files
