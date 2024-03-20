@@ -65,6 +65,62 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static final double PHYSIC_TIME_FACTOR = 0.005;
     private static final Map<String, Object> resources = new LinkedHashMap<>(20, 0.80f);
+
+
+    /**
+     * the internal drawing image buffer
+     */
+    BufferedImage buffer;
+    /**
+     * the {@link JFrame} used as a window for out game.
+     */
+    JFrame frame;
+
+    /**
+     * Internal {@link Platform2D} instance name.
+     */
+    private String name;
+    /**
+     * configured screen buffer size
+     */
+    private Dimension bufferSize;
+    /**
+     * Configured game Window size.
+     */
+    private Dimension screenSize;
+
+    /**
+     * Flag to request game loop exit and Platform2D instance ending.
+     */
+    private boolean exit;
+
+    /**
+     * Internal keyboard status array to track each Key state (true=pressed).
+     */
+    private final boolean[] keys = new boolean[1024];
+
+    /**
+     * Internal list of  Scene's {@link GameObject}.
+     */
+    final List<GameObject> objects = new CopyOnWriteArrayList<>();
+    /**
+     * Internal Map of Scene {@link GameObject} for simplify of instance access
+     */
+    final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
+
+    /**
+     * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
+     * and/or can be exposed/exported at anytime.
+     */
+    Map<String, Object> stats = new HashMap<>();
+
+    /**
+     * The game {@link World} context where all the {@link GameObject} will move in.
+     */
+    private World world;
+
+    private Camera camera;
+
     /**
      * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
      */
@@ -85,10 +141,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private boolean updateFlag = true;
     private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
-
-    public void setWorld(World world) {
-        this.world = world;
-    }
 
     /**
      * The {@link Vec2d} class is a 2-dimension vector.
@@ -488,59 +540,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private static Properties config = new Properties();
 
-    /**
-     * the internal drawing image buffer
-     */
-    BufferedImage buffer;
-    /**
-     * the {@link JFrame} used as a window for out game.
-     */
-    JFrame frame;
-
-    /**
-     * Internal {@link Platform2D} instance name.
-     */
-    private String name;
-    /**
-     * configured screen buffer size
-     */
-    private Dimension bufferSize;
-    /**
-     * Configured game Window size.
-     */
-    private Dimension screenSize;
-
-    /**
-     * Flag to request game loop exit and Platform2D instance ending.
-     */
-    private boolean exit;
-
-    /**
-     * Internal keyboard status array to track each Key state (true=pressed).
-     */
-    private final boolean[] keys = new boolean[1024];
-
-    /**
-     * Internal list of  Scene's {@link GameObject}.
-     */
-    final List<GameObject> objects = new CopyOnWriteArrayList<>();
-    /**
-     * Internal Map of Scene {@link GameObject} for simplify of instance access
-     */
-    final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
-
-    /**
-     * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
-     * and/or can be exposed/exported at anytime.
-     */
-    Map<String, Object> stats = new HashMap<>();
-
-    /**
-     * The game {@link World} context where all the {@link GameObject} will move in.
-     */
-    private World world;
-
-    private Camera camera;
 
     /**
      * Create a new {@link Platform2D} instance, having an <code>appName</code>,
@@ -1384,6 +1383,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     public boolean isKeyPressed(int keyCode) {
         return keys[keyCode];
+    }
+
+
+    public void setWorld(World world) {
+        this.world = world;
     }
 
     /**
