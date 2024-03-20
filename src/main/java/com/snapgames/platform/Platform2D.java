@@ -1,5 +1,7 @@
 package com.snapgames.platform;
 
+import com.snapgames.platform.demo.DemoScene;
+
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
@@ -10,10 +12,11 @@ import java.awt.event.KeyListener;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,8 +122,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private World world;
 
-    private Camera camera;
-
     /**
      * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
      */
@@ -141,6 +142,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private boolean updateFlag = true;
     private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
+    private SceneManager scnManager;
+    private String defaultSceneName = "start";
+    private String[] strSceneList = new String[]{"start:Platform2D"};
+
 
     /**
      * The {@link Vec2d} class is a 2-dimension vector.
@@ -403,7 +408,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.setDebugOffsetY(8);
         }
 
-        TextObject setText(String text) {
+        public TextObject setText(String text) {
             this.text = text;
             return this;
         }
@@ -413,7 +418,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return this;
         }
 
-        public GameObject setShadowColor(Color shadow) {
+        public TextObject setShadowColor(Color shadow) {
             this.shadowColor = shadow;
             return this;
         }
@@ -466,6 +471,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         private Rectangle2D playArea;
         private List<ConstraintObject> constrains = new ArrayList<>();
 
+        public World() {
+            this(new Vec2d(0.0, 0.0), new Rectangle2D.Double(0, 0, 320, 200));
+        }
+
         public World(Vec2d gravity, Rectangle2D playAreaSize) {
             this.gravity = gravity;
             this.playArea = playAreaSize;
@@ -499,17 +508,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super(name);
         }
 
-        Camera setTarget(GameObject target) {
+        public Camera setTarget(GameObject target) {
             this.target = target;
             return this;
         }
 
-        Camera setTweenFactor(double tf) {
+        public Camera setTweenFactor(double tf) {
             this.tweenFactor = tf;
             return this;
         }
 
-        Camera setViewport(Rectangle2D vp) {
+        public Camera setViewport(Rectangle2D vp) {
             this.viewport = vp;
             return this;
         }
@@ -530,6 +539,250 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    public interface Scene {
+        String getName();
+
+        void initialize(Platform2D app);
+
+        void create(Platform2D app);
+
+        void input(Platform2D app);
+
+        default void update(Platform2D app, Map<String, Object> stats, double elapsed) {
+
+        }
+
+        default void draw(Platform2D app, Graphics2D g, Map<String, Object> stats) {
+
+        }
+
+        void close(Platform2D app);
+
+        void dispose(Platform2D app);
+
+        default void keyPressed(KeyEvent e) {
+        }
+
+        default void keyReleased(KeyEvent e) {
+        }
+
+        Camera getCamera();
+    }
+
+    public static abstract class AbstractScene implements Scene {
+        protected final Platform2D app;
+        private Platform2D.Camera camera;
+
+        public AbstractScene(Platform2D app) {
+            this.app = app;
+        }
+
+
+        protected void setCamera(Platform2D.Camera cam) {
+            this.camera = cam;
+        }
+
+
+        public Platform2D.Camera getCamera() {
+            return camera;
+        }
+
+        public void addEnemies(Platform2D app, int nbEnemies) {
+            for (int i = 0; i < nbEnemies; i++) {
+                // add a player object
+                Platform2D.GameObject enemy = new Platform2D.GameObject(
+                    "enemy_" + i,
+                    Math.random() * app.getBufferSize().width, Math.random() * app.getBufferSize().height,
+                    8, 8)
+                    .setMaterial(new Platform2D.Material("enemy", 0.7, 0.80, 0.99))
+                    .setFillColor(Color.BLUE)
+                    .setBorderColor(Color.DARK_GRAY)
+                    .addAttribute("energy", 100)
+                    .addAttribute("mana", 100)
+                    .setPriority(10 + i)
+                    .setMass(10.0);
+                app.addGameObject(enemy);
+            }
+        }
+
+        @Override
+        public abstract String getName();
+
+        @Override
+        public void initialize(Platform2D app) {
+
+        }
+
+        @Override
+        public void create(Platform2D app) {
+
+        }
+
+        @Override
+        public void input(Platform2D app) {
+
+        }
+
+        public void close(Platform2D app) {
+
+        }
+
+        public void dispose(Platform2D app) {
+
+        }
+
+    }
+
+    public static class StartScene extends AbstractScene {
+
+        public StartScene(Platform2D app) {
+            super(app);
+        }
+
+        @Override
+        public void initialize(Platform2D app) {
+            getResource("/assets/images/backgrounds/volcano.png");
+        }
+
+        @Override
+        public void create(Platform2D app) {
+            Graphics2D gb = app.getDrawBuffer().createGraphics();
+
+            // add background Image
+            BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
+            ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
+                .setImage(bckImage).setPriority(0);
+            app.addGameObject(backgroundIObj);
+
+            // add welcome message
+            String welcomeTxt = getMessage("app.start.welcome");
+            Font welcomeFont = gb.getFont().deriveFont(18.0f);
+            gb.setFont(welcomeFont);
+            int textWidth = gb.getFontMetrics().stringWidth(welcomeTxt);
+            TextObject txtObject = (TextObject) new TextObject("welcome")
+                .setText(welcomeTxt)
+                .setShadowColor(Color.BLACK)
+                .setFont(welcomeFont)
+                .setPosition((app.getBufferSize().width - textWidth) * 0.5, app.getBufferSize().height * 0.5)
+                .setBorderColor(Color.WHITE)
+                .setPriority(1)
+                .setStaticObject(true);
+            app.addGameObject(txtObject);
+        }
+
+        @Override
+        public String getName() {
+            return "start";
+        }
+    }
+
+    public static class SceneManager {
+        private Map<String, Scene> scenes = new HashMap<>();
+        private Scene activeScene = null;
+
+        private Platform2D app;
+
+        SceneManager(Platform2D a) {
+            this.app = a;
+        }
+
+        /**
+         * Provide a list of scene implementation to be preloaded into the Scene manager tobe later activated.
+         * <p>
+         * The correct format for scene list string is "<code>scene1:my.implementation.of.Scene1,scene2:my.implementation.of.Scene2[,...]</code>".
+         *
+         * @param sceneItems a string array containing list of tuple "[scene_key]:[scene_implementation_class]"
+         */
+        public void load(String[] sceneItems) {
+            Arrays.stream(sceneItems).forEach(item -> {
+                String[] attrs = item.split(":");
+                // Create Scene instance according to the defined class.
+                try {
+                    Class<?> sceneClass = Class.forName(attrs[1]);
+                    Constructor<?> cstr = sceneClass.getConstructor(Platform2D.class);
+                    Scene scene = (Scene) cstr.newInstance(this.app);
+                    scenes.put(scene.getName(), scene);
+                } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException |
+                         IllegalAccessException | InvocationTargetException e) {
+                    error("Can not create the %s class: %s%n", attrs[1], e.getMessage());
+                }
+            });
+        }
+
+        public void add(Scene s) {
+            scenes.put(s.getName(), s);
+        }
+
+        private void activate(String sName) {
+            if (!scenes.isEmpty()) {
+                if (Optional.ofNullable(activeScene).isPresent()) {
+                    activeScene.close(app);
+                }
+
+                activeScene = scenes.get(sName);
+                activeScene.initialize(app);
+                activeScene.create(app);
+            }
+        }
+
+        public void create() {
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.create(app);
+
+            }
+        }
+
+        public void update(Map<String, Object> stats, double elapsed) {
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.update(app, stats, elapsed);
+            }
+        }
+
+        public void input() {
+            if (Optional.ofNullable(activeScene).isPresent()) {
+
+                activeScene.input(app);
+            }
+        }
+
+        public void draw(Graphics2D g, Map<String, Object> stats) {
+            if (Optional.ofNullable(activeScene).isPresent()) {
+
+                activeScene.draw(app, g, stats);
+            }
+        }
+
+        public void dispose() {
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.dispose(app);
+            }
+        }
+
+        public void disposeAll() {
+            scenes.values().stream().forEach(s -> s.dispose(app));
+            activeScene = null;
+        }
+
+        public Collection<Scene> getScenes() {
+            return scenes.values();
+        }
+
+        public Scene getActive() {
+            return activeScene;
+        }
+
+        public void keyReleased(KeyEvent e) {
+            activeScene.keyReleased(e);
+        }
+
+        public void keyPressed(KeyEvent e) {
+            activeScene.keyPressed(e);
+        }
+
+        public Scene getActiveScene() {
+            return activeScene;
+        }
+    }
 
     /**
      * The translated messages to be displayed in log or on screen.
@@ -566,14 +819,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param args the java CLI arguments.
      */
     void initialize(String[] args) {
-        intializeDefaultConfiguration();
+        // load configuration
+        initializeDefaultConfiguration();
         parseArguments(args);
-        loadConfiguration(configurationFilePath);
-        buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
-        frame = new JFrame(messages.getString("app.title"));
+        config = loadConfiguration(configurationFilePath);
+        parseArguments(config);
+        parseArguments(args);
+
+        // set Content size
         setPreferredSize(screenSize);
         setMaximumSize(screenSize);
         setMinimumSize(screenSize);
+
+        // create internal drawing buffer
+        buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
+
+        // create window
+        frame = new JFrame(getMessage("app.title"));
+
         frame.setContentPane(this);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.addComponentListener(this);
@@ -584,29 +847,55 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
         frame.createBufferStrategy(3);
 
-        createScene();
+
+        // prepare Scenes
+        scnManager = new SceneManager(this);
+        scnManager.load(strSceneList);
+        if (!testMode && scnManager.getScenes().isEmpty()) {
+            Scene start = new StartScene(this);
+            setWorld(new World());
+            scnManager.add(start);
+
+        }
+        // activate the default scene
+
+        scnManager.activate(defaultSceneName);
     }
 
-    private void intializeDefaultConfiguration() {
+    public static String getMessage(String key) {
+        return messages.getString(key);
+    }
+
+    private void initializeDefaultConfiguration() {
         config.put("app.debug.level", "0");
         config.put("app.debug.filter", "");
         config.put("app.screen.size", "320x200");
         config.put("app.window.size", "640x400");
+        config.put("app.scenes.default", "start");
+        if (!testMode) {
+            config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
+            config.put("app.test.mode", "false");
+        }
+
     }
 
+    protected void loadScenes() {
+        scnManager.add(new DemoScene(this));
+    }
 
     /**
      * Load configuration file.
      *
      * @param configPathFile the properties file.
      */
-    private void loadConfiguration(String configPathFile) {
+    private Properties loadConfiguration(String configPathFile) {
         try {
             config.load(Platform2D.class.getResourceAsStream(configPathFile));
             parseArguments(config);
         } catch (IOException e) {
             error("Unable to load file %s", configPathFile);
         }
+        return config;
     }
 
     /**
@@ -657,67 +946,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                     }
                     case "app.debug.level", "debug", "d" -> debug = Integer.parseInt((String) value);
                     case "app.debug.filter", "filter", "df" -> debugFilter = (String) value;
-                    case "app.test.mode" -> this.testMode = Boolean.parseBoolean((String) value);
+                    case "app.test.mode", "test" -> this.testMode = Boolean.parseBoolean((String) value);
+                    case "app.scenes.default", "default" -> this.defaultSceneName = (String) value;
+                    case "app.scenes.list", "scenes" -> this.strSceneList = ((String) value).split(",");
                     default -> warn("Value entry unknown %s=%s", key, value);
                 }
             }
         } else {
-            error("Configuration file %s is empty", configurationFilePath);
+            error("Configuration is missing");
         }
-    }
-
-    private void createScene() {
-        // define the game World
-        world = new World(new Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
-
-        BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
-        ImageObject background = (ImageObject) new ImageObject("background")
-            .setImage(backgroundImg)
-            .setStaticObject(true)
-            .setPriority(-10);
-        addGameObject(background);
-
-
-        // add a player object
-        GameObject player = new GameObject(
-            "player",
-            bufferSize.width >> 1, bufferSize.height >> 1,
-            16, 16)
-            .setMaterial(new Material("player", 1.0, 0.30, 0.92))
-            .addAttribute("energy", 100)
-            .addAttribute("mana", 100)
-            .addAttribute("lives", 3)
-            .setMass(80.0);
-        addGameObject(player);
-
-        createHUD(player);
-
-        // Add some constraining object.
-        ConstraintObject water = (ConstraintObject) new ConstraintObject("water",
-            0,
-            world.getPlayArea().getHeight() * 0.70,
-            world.getPlayArea().getWidth(),
-            world.getPlayArea().getHeight() * 0.30)
-            .setPriority(2)
-            .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
-            .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
-            .addForce(new Vec2d(0, -0.3));
-        addGameObject(water);
-
-        world.addConstrain(water);
-
-        // add some enemies
-        addEnemies(10);
-
-        setCamera(new Camera("cam01")
-            .setTarget(player)
-            .setTweenFactor(0.05)
-            .setViewport(new Rectangle2D.Double(0, 0, bufferSize.getWidth(), bufferSize.getHeight())));
-
-    }
-
-    private void setCamera(Camera cam) {
-        this.camera = cam;
     }
 
     private void createHUD(GameObject player) {
@@ -776,7 +1013,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param path file path to the resources to be retrieved/loaded.
      * @return the corresponding object resource.
      */
-    static Object getResource(String path) {
+    public static Object getResource(String path) {
         Object resource = null;
         if (!resources.containsKey(path)) {
             String ext = "";
@@ -817,30 +1054,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
-    private void addEnemies(int nbEnemies) {
-        for (int i = 0; i < nbEnemies; i++) {
-            // add a player object
-            GameObject enemy = new GameObject(
-                "enemy_" + i,
-                Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                8, 8)
-                .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
-                .setFillColor(Color.BLUE)
-                .setBorderColor(Color.DARK_GRAY)
-                .addAttribute("energy", 100)
-                .addAttribute("mana", 100)
-                .setPriority(10 + i)
-                .setMass(10.0);
-            addGameObject(enemy);
-        }
-    }
-
-    void addGameObject(GameObject gameObject) {
-        objects.add(gameObject);
-        objectMap.put(gameObject.getName(), gameObject);
-        // update statistics data
-        objects.sort((a, b) -> Integer.compare(a.priority, b.priority));
-    }
 
     private void run(String[] args) {
         initialize(args);
@@ -925,23 +1138,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * Process the inputs (keyboard)
      */
     private void input() {
-        GameObject player = objectMap.get("player");
-        double speed = (double) player.attributes.getOrDefault("speed", 0.5);
-        if (isKeyPressed(KeyEvent.VK_UP)) {
-            player.forces.add(new Vec2d(0, -speed));
-        }
-        if (isKeyPressed(KeyEvent.VK_DOWN)) {
-            player.forces.add(new Vec2d(0, speed));
-        }
-        if (isKeyPressed(KeyEvent.VK_LEFT)) {
-            player.forces.add(new Vec2d(-speed, 0));
-        }
-        if (isKeyPressed(KeyEvent.VK_RIGHT)) {
-            player.forces.add(new Vec2d(speed, 0));
-        }
-
-        if (isKeyPressed(KeyEvent.VK_X)) {
-
+        if (!objectMap.isEmpty()) {
+            scnManager.input();
         }
 
     }
@@ -986,9 +1184,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 o.forces.clear();
 
             });
-        if (Optional.ofNullable(camera).isPresent()) {
-            camera.update(elapsed);
+        if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
+            Camera camera = scnManager.getActiveScene().getCamera();
+            if (Optional.ofNullable(camera).isPresent()) {
+                camera.update(elapsed);
+            }
         }
+        scnManager.update(stats, elapsed);
     }
 
     /**
@@ -1052,6 +1254,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param stats the internal statistics and KPI to be displayed on screen (only if debug>0)
      */
     private void draw(Map<String, Object> stats) {
+        Camera camera = scnManager.getActiveScene().getCamera();
         Graphics2D gb = buffer.createGraphics();
         // set Antialiasing mode
         gb.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -1061,16 +1264,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         gb.setBackground(Color.BLACK);
         gb.clearRect(0, 0, 640, 400);
 
-        gb.translate(-camera.x, -camera.y);
+        if (Optional.ofNullable(camera).isPresent()) {
+            gb.translate(-camera.x, -camera.y);
+        }
         drawAllEntity(gb, false);
 
-        if (debug > 1) {
+        if (Optional.ofNullable(world).isPresent() && debug > 1) {
             gb.setColor(Color.YELLOW);
             gb.draw(world.getPlayArea());
         }
 
-        gb.translate(camera.x, camera.y);
+        if (Optional.ofNullable(camera).isPresent()) {
+            gb.translate(camera.x, camera.y);
+        }
         drawAllEntity(gb, true);
+        scnManager.draw(gb, stats);
 
         gb.dispose();
 
@@ -1273,6 +1481,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * free all created/loaded resources.
      */
     void dispose() {
+        if (Optional.ofNullable(scnManager).isPresent()) {
+            scnManager.disposeAll();
+        }
         if (Optional.ofNullable(frame).isPresent()) {
             frame.dispose();
         }
@@ -1289,6 +1500,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     @Override
     public void keyPressed(KeyEvent e) {
         keys[e.getKeyCode()] = true;
+
+        scnManager.keyPressed(e);
     }
 
     @Override
@@ -1302,7 +1515,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             case KeyEvent.VK_Z -> {
                 if (e.isControlDown()) {
                     resetScene();
-                    createScene();
+                    scnManager.activate(defaultSceneName);
                 }
             }
             // switch debug mode level
@@ -1313,21 +1526,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                     debug = (debug < 5 ? debug + 1 : 1);
                 }
             }
-            case KeyEvent.VK_PAGE_UP -> {
-                int nb = 10;
-                if (e.isControlDown()) {
-                    nb *= 10;
-                }
-                if (e.isShiftDown()) {
-                    nb *= 5;
-                }
-                addEnemies(nb);
-            }
+
             default -> {
                 // Nothing to do !
             }
         }
-
+        scnManager.keyReleased(e);
     }
 
     /**
@@ -1385,9 +1589,27 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return keys[keyCode];
     }
 
-
     public void setWorld(World world) {
         this.world = world;
+    }
+
+    public Dimension getBufferSize() {
+        return bufferSize;
+    }
+
+    public BufferedImage getDrawBuffer() {
+        return buffer;
+    }
+
+    public void addGameObject(GameObject gameObject) {
+        objects.add(gameObject);
+        objectMap.put(gameObject.getName(), gameObject);
+        // update statistics data
+        objects.sort((a, b) -> Integer.compare(a.priority, b.priority));
+    }
+
+    public GameObject getObject(String name) {
+        return objectMap.get(name);
     }
 
     /**

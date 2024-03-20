@@ -14,6 +14,7 @@ public class Platform2DPhysicProcessingTest {
     @BeforeEach
     public void setup() {
         platform = new Platform2D("Test Platform2D");
+        platform.initialize(new String[]{"cf=/debug-config-test.properties", "test=true"});
     }
 
     @AfterEach
