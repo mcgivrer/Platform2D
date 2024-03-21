@@ -207,6 +207,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public double timer = 0;
         protected String name = "gameobject_" + id;
 
+        protected Node parent;
+
+        protected List<Node> children = new ArrayList<>();
+
         public Node(double x, double y, double w, double h, String name) {
             super(x, y, w, h);
             this.name = name;
@@ -214,6 +218,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         public Node() {
             super();
+        }
+
+        public void add(Node child) {
+            setParent(this);
+            children.add(child);
+        }
+
+        public List<Node> getChild() {
+            return children;
+        }
+
+        private void setParent(Node node) {
+            this.parent = node;
         }
 
         public Node setLifespan(int d) {
