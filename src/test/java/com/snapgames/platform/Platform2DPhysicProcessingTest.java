@@ -1,5 +1,6 @@
 package com.snapgames.platform;
 
+import com.snapgames.platform.Platform2D.GameObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,7 @@ public class Platform2DPhysicProcessingTest {
                 new Platform2D.Vec2d(0, 0.981),
                 new Rectangle2D.Double(0, 0, 200, 200)));
 
-        Platform2D.GameObject gameObject = new Platform2D.GameObject("go", 100, 100, 50, 50)
+        GameObject gameObject = new GameObject("go", 100, 100, 50, 50)
             .setVelocity(1, 1)
             .setAcceleration(0.5, 0.5)
             .setStaticObject(false);

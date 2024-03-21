@@ -197,17 +197,60 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    public static class Node extends Rectangle2D.Double {
+        private static long index = 0;
+
+        private long id = ++index;
+
+        public boolean active = true;
+        public double lifespan = -1;
+        public double timer = 0;
+        protected String name = "gameobject_" + id;
+
+        public Node(double x, double y, double w, double h, String name) {
+            super(x, y, w, h);
+            this.name = name;
+        }
+
+        public Node() {
+            super();
+        }
+
+        public Node setLifespan(int d) {
+            this.lifespan = d;
+            return this;
+        }
+
+        public long getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void update(double elapsed) {
+            // Compute lifespan & Duration.
+            if (lifespan != -1) {
+                timer += elapsed;
+                if (timer > lifespan) {
+                    active = false;
+                }
+            }
+        }
+
+        public boolean isActive() {
+            return active;
+        }
+    }
+
     /**
      * The {@link GameObject} entity to be moved and animated.
      *
      * @author Frédéric Delorme
      * @since 1.0.0
      */
-    public static class GameObject extends Rectangle2D.Double {
-        private static long index = 0;
-        public boolean active = true;
-        private long id = ++index;
-        private String name = "gameobject_" + id;
+    public static class GameObject extends Node {
         public double dx, dy;
         public double ax, ay;
 
@@ -226,9 +269,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public boolean stickToCamera = false;
         public int priority = 1;
 
-        public double lifespan = -1;
-        public double timer = 0;
-
         public double debugOffsetY = 0;
 
         public GameObject() {
@@ -241,13 +281,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
         public GameObject(String name, double x, double y, double w, double h) {
-            super(x, y, w, h);
-            this.name = name;
-        }
-
-        public GameObject setLifespan(int d) {
-            this.lifespan = d;
-            return this;
+            super(x, y, w, h, name);
         }
 
         public GameObject setPosition(double x, double y) {
@@ -266,14 +300,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.ax = ax;
             this.ay = ay;
             return this;
-        }
-
-        public long getId() {
-            return id;
-        }
-
-        public String getName() {
-            return name;
         }
 
         public GameObject setFillColor(Color fill) {
@@ -296,7 +322,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return this;
         }
 
-        public GameObject setStickToCamera(boolean stc) {
+        public Node setStickToCamera(boolean stc) {
             this.stickToCamera = stc;
             return this;
         }
@@ -305,7 +331,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return this.stickToCamera;
         }
 
-        public GameObject addForce(Vec2d f) {
+        public Node addForce(Vec2d f) {
             forces.add(f);
             return this;
         }
@@ -325,20 +351,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return this;
         }
 
-        public void update(double elapsed) {
-            // Compute lifespan & Duration.
-            if (lifespan != -1) {
-                timer += elapsed;
-                if (timer > lifespan) {
-                    active = false;
-                }
-            }
-        }
-
-        public boolean isActive() {
-            return active;
-        }
-
         public boolean isObjectStatic() {
             return staticObject;
         }
@@ -353,9 +365,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return dbgInfo;
         }
 
-        protected GameObject setDebugOffsetY(int offY) {
+        protected Node setDebugOffsetY(int offY) {
             this.debugOffsetY = offY;
             return this;
+        }
+
+        public boolean isStaticObject() {
+            return staticObject;
         }
     }
 
@@ -500,7 +516,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     public static class Camera extends GameObject {
-        private GameObject target;
+        private Node target;
         private double tweenFactor;
         private Rectangle2D viewport;
 
@@ -508,7 +524,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super(name);
         }
 
-        public Camera setTarget(GameObject target) {
+        public Camera setTarget(Node target) {
             this.target = target;
             return this;
         }
@@ -590,7 +606,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public void addEnemies(Platform2D app, int nbEnemies) {
             for (int i = 0; i < nbEnemies; i++) {
                 // add a player object
-                Platform2D.GameObject enemy = new Platform2D.GameObject(
+                GameObject enemy = new GameObject(
                     "enemy_" + i,
                     Math.random() * app.getBufferSize().width, Math.random() * app.getBufferSize().height,
                     8, 8)
@@ -720,8 +736,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
 
                 activeScene = scenes.get(sName);
-                activeScene.initialize(app);
-                activeScene.create(app);
+                if (Optional.ofNullable(activeScene).isPresent()) {
+                    activeScene.initialize(app);
+                    activeScene.create(app);
+                }
             }
         }
 
@@ -1120,7 +1138,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         double elapsed) {
 
         long countActive = objects.stream()
-            .filter(GameObject::isActive).count();
+            .filter(Node::isActive).count();
         long countStatic = objects.stream()
             .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
@@ -1152,7 +1170,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     void update(double elapsed) {
         objects.stream()
             // process only active and non-static objects
-            .filter(o -> !o.staticObject && o.active)
+            .filter(o -> !o.isStaticObject() && o.isActive())
             .forEach(o -> {
                 // reset current GameObject acceleration
                 o.ax = 0;
@@ -1289,7 +1307,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
         objects.stream()
-            .filter(GameObject::isActive)
+            .filter(Node::isActive)
             .filter(o -> o.getStickToCamera() == stickToCamera)
             .forEach(o -> {
                 drawGameObject(gb, o);
