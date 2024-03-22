@@ -36,7 +36,7 @@ public class DemoScene extends Platform2D.AbstractScene {
             .setImage(backgroundImg)
             .setStaticObject(true)
             .setPriority(-10);
-        app.addGameObject(background);
+        add(background);
 
         // add a player object
         Platform2D.GameObject player = new Platform2D.GameObject(
@@ -48,7 +48,7 @@ public class DemoScene extends Platform2D.AbstractScene {
             .addAttribute("mana", 100)
             .addAttribute("lives", 3)
             .setMass(80.0);
-        app.addGameObject(player);
+        add(player);
 
         createHUD(app, player);
 
@@ -62,7 +62,7 @@ public class DemoScene extends Platform2D.AbstractScene {
             .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
             .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
             .addForce(new Platform2D.Vec2d(0, -0.3));
-        app.addGameObject(water);
+        add(water);
 
         world.addConstrain(water);
 
@@ -89,7 +89,7 @@ public class DemoScene extends Platform2D.AbstractScene {
             .setPriority(1)
             .setStaticObject(true)
             .setStickToCamera(true);
-        app.addGameObject(score);
+        add(score);
 
         BufferedImage heartImage = ((BufferedImage) getResource("/assets/images/tiles01.png|0,96,16,16"));
         Platform2D.ImageObject heart = (Platform2D.ImageObject) new Platform2D.ImageObject("heart")
@@ -109,13 +109,13 @@ public class DemoScene extends Platform2D.AbstractScene {
             .setPriority(2)
             .setStaticObject(true)
             .setStickToCamera(true);
-        app.addGameObject(heart);
-        app.addGameObject(lifes);
+        add(heart);
+        add(lifes);
     }
 
     @Override
     public void input(Platform2D app) {
-        Platform2D.GameObject player = app.getObject("player");
+        Platform2D.GameObject player = getObject("player");
         double speed = (double) player.attributes.getOrDefault("speed", 0.5);
         if (app.isKeyPressed(KeyEvent.VK_UP)) {
             player.forces.add(new Platform2D.Vec2d(0, -speed));
@@ -152,4 +152,21 @@ public class DemoScene extends Platform2D.AbstractScene {
         }
     }
 
+    private void addEnemies(Platform2D app, int nbEnemies) {
+        for (int i = 0; i < nbEnemies; i++) {
+            // add a player object
+            Platform2D.GameObject enemy = new Platform2D.GameObject(
+                "enemy_" + i,
+                Math.random() * app.getBufferSize().width, Math.random() * app.getBufferSize().height,
+                8, 8)
+                .setMaterial(new Platform2D.Material("enemy", 0.7, 0.80, 0.99))
+                .setFillColor(Color.BLUE)
+                .setBorderColor(Color.DARK_GRAY)
+                .addAttribute("energy", 100)
+                .addAttribute("mana", 100)
+                .setPriority(10 + i)
+                .setMass(10.0);
+            add(enemy);
+        }
+    }
 }
