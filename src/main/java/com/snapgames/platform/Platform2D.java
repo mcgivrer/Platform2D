@@ -20,7 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 /**
@@ -102,14 +101,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private final boolean[] keys = new boolean[1024];
 
-    /**
-     * Internal list of  Scene's {@link GameObject}.
-     */
-    final List<GameObject> objects = new CopyOnWriteArrayList<>();
-    /**
-     * Internal Map of Scene {@link GameObject} for simplify of instance access
-     */
-    final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
 
     /**
      * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
@@ -125,7 +116,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     /**
      * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
      */
-    int debug = 0;
+    static int debug = 0;
     /**
      * filtering the visual debug information screen by listing (coma separated)
      * in the filter the targeted object's names.
@@ -600,13 +591,30 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
         Camera getCamera();
+
+        List<? extends Node> getChild();
+
+        void add(GameObject go);
+
+        GameObject getObject(String goName);
+
+        void reset();
+
+        GameObject getObject(int idx);
     }
 
-    public static abstract class AbstractScene implements Scene {
+    public static abstract class AbstractScene extends Node implements Scene {
         protected final Platform2D app;
-        private Platform2D.Camera camera;
+        protected Platform2D.Camera camera;
+
+        /**
+         * Internal Map of Scene {@link GameObject} for simplify of instance access
+         */
+        final Map<String, GameObject> objectMap = new ConcurrentHashMap<>();
 
         public AbstractScene(Platform2D app) {
+            super();
+            this.name = getName();
             this.app = app;
         }
 
@@ -616,27 +624,25 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
 
+        public void add(GameObject gameObject) {
+            super.add(gameObject);
+            objectMap.put(gameObject.getName(), gameObject);
+            // update statistics data
+            getChild().sort((a, b) -> Integer.compare(((GameObject) a).priority, ((GameObject) b).priority));
+        }
+
+        public GameObject getObject(String name) {
+            return objectMap.get(name);
+        }
+
+        public GameObject getObject(int idx) {
+            return (GameObject) children.get(idx);
+        }
+
         public Platform2D.Camera getCamera() {
             return camera;
         }
 
-        public void addEnemies(Platform2D app, int nbEnemies) {
-            for (int i = 0; i < nbEnemies; i++) {
-                // add a player object
-                GameObject enemy = new GameObject(
-                    "enemy_" + i,
-                    Math.random() * app.getBufferSize().width, Math.random() * app.getBufferSize().height,
-                    8, 8)
-                    .setMaterial(new Platform2D.Material("enemy", 0.7, 0.80, 0.99))
-                    .setFillColor(Color.BLUE)
-                    .setBorderColor(Color.DARK_GRAY)
-                    .addAttribute("energy", 100)
-                    .addAttribute("mana", 100)
-                    .setPriority(10 + i)
-                    .setMass(10.0);
-                app.addGameObject(enemy);
-            }
-        }
 
         @Override
         public abstract String getName();
@@ -664,6 +670,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         }
 
+        public void reset() {
+            objectMap.clear();
+            children.clear();
+        }
+
     }
 
     public static class StartScene extends AbstractScene {
@@ -685,7 +696,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
             ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
                 .setImage(bckImage).setPriority(0);
-            app.addGameObject(backgroundIObj);
+            add(backgroundIObj);
 
             // add welcome message
             String welcomeTxt = getMessage("app.start.welcome");
@@ -700,7 +711,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 .setBorderColor(Color.WHITE)
                 .setPriority(1)
                 .setStaticObject(true);
-            app.addGameObject(txtObject);
+            add(txtObject);
         }
 
         @Override
@@ -895,7 +906,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         // activate the default scene
 
         scnManager.activate(defaultSceneName);
+        logDebugSceneTreeNode((Node) scnManager.getActive(), 0);
     }
+
+    private void logDebugSceneTreeNode(Node node, int level) {
+
+        debug("%s|_ node:%s", "   ".repeat(level), node.getName());
+        level += 1;
+        for (Node n : node.getChild()) {
+            debug("%s|_ node:%s", "   ".repeat(level), n.getName());
+            if (n.getChild().size() > 0) {
+                logDebugSceneTreeNode(n, level);
+            }
+        }
+    }
+
 
     public static String getMessage(String key) {
         return messages.getString(key);
@@ -990,41 +1015,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         } else {
             error("Configuration is missing");
         }
-    }
-
-    private void createHUD(GameObject player) {
-        TextObject score = (TextObject) new TextObject("score")
-            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
-            .setText("000000")
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(8, 16)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(1)
-            .setStaticObject(true)
-            .setStickToCamera(true);
-        addGameObject(score);
-
-        BufferedImage heartImage = ((BufferedImage) getResource("/assets/images/tiles01.png|0,96,16,16"));
-        ImageObject heart = (ImageObject) new ImageObject("heart")
-            .setImage(heartImage)
-            .setPosition(bufferSize.width - 32, 16)
-            .setPriority(1)
-            .setStaticObject(true)
-            .setStickToCamera(true);
-
-        TextObject lifes = (TextObject) new TextObject("lives")
-            .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
-            .setText("" + (player.attributes.get("lives")))
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(bufferSize.width - 24, 20)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(2)
-            .setStaticObject(true)
-            .setStickToCamera(true);
-        addGameObject(heart);
-        addGameObject(lifes);
     }
 
     /**
@@ -1153,7 +1143,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         long updatesPerSec,
         long gameTime,
         double elapsed) {
-
+        Scene scn = getSceneManager().getActiveScene();
+        List<GameObject> objects = (List<GameObject>) scn.getChild();
         long countActive = objects.stream()
             .filter(Node::isActive).count();
         long countStatic = objects.stream()
@@ -1169,14 +1160,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    public SceneManager getSceneManager() {
+        return scnManager;
+    }
+
     /**
      * Process the inputs (keyboard)
      */
     private void input() {
-        if (!objectMap.isEmpty()) {
-            scnManager.input();
-        }
-
+        scnManager.input();
     }
 
     /**
@@ -1185,10 +1177,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed
      */
     void update(double elapsed) {
-        objects.stream()
+        Scene scn = getSceneManager().getActiveScene();
+
+        scn.getChild().stream()
             // process only active and non-static objects
-            .filter(o -> !o.isStaticObject() && o.isActive())
-            .forEach(o -> {
+            .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
+            .forEach(n -> {
+                GameObject o = (GameObject) n;
                 // reset current GameObject acceleration
                 o.ax = 0;
                 o.ay = 0;
@@ -1323,12 +1318,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
-        objects.stream()
+        Scene scn = getSceneManager().getActiveScene();
+
+        scn.getChild().stream()
             .filter(Node::isActive)
-            .filter(o -> o.getStickToCamera() == stickToCamera)
+            .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
             .forEach(o -> {
-                drawGameObject(gb, o);
-                drawDebugInfo(o, gb);
+                drawGameObject(gb, (GameObject) o);
+                drawDebugInfo(gb, (GameObject) o);
             });
     }
 
@@ -1461,10 +1458,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     /**
      * Draw visual debug information relative to a specific {@link GameObject} instance.
      *
-     * @param o  the {@link GameObject} to display visual debug information for.
      * @param gb the {@link Graphics2D} API instance to be used.
+     * @param o  the {@link GameObject} to display visual debug information for.
      */
-    private void drawDebugInfo(GameObject o, Graphics2D gb) {
+    private void drawDebugInfo(Graphics2D gb, GameObject o) {
         if (Optional.ofNullable(debugFilter).isPresent()
             && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
             if (debug > 0) {
@@ -1573,8 +1570,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * Reset all objects from the current scene
      */
     private void resetScene() {
-        objects.clear();
-        objectMap.clear();
+        scnManager.getActive().reset();
     }
 
     /*---- Component Event processing ---------------------------*/
@@ -1600,7 +1596,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     /*---- write to output log according to risk level (INFO, DEBUG, WARN, ERROR) ----*/
     public static void debug(String message, Object... args) {
-        log("DEBUG", message, args);
+        if (Platform2D.debug > 0) {
+            log("DEBUG", message, args);
+        }
     }
 
     public static void error(String message, Object... args) {
@@ -1634,17 +1632,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     public BufferedImage getDrawBuffer() {
         return buffer;
-    }
-
-    public void addGameObject(GameObject gameObject) {
-        objects.add(gameObject);
-        objectMap.put(gameObject.getName(), gameObject);
-        // update statistics data
-        objects.sort((a, b) -> Integer.compare(a.priority, b.priority));
-    }
-
-    public GameObject getObject(String name) {
-        return objectMap.get(name);
     }
 
     /**

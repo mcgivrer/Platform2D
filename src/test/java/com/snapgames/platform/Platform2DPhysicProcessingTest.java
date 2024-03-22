@@ -15,7 +15,7 @@ public class Platform2DPhysicProcessingTest {
     @BeforeEach
     public void setup() {
         platform = new Platform2D("Test Platform2D");
-        platform.initialize(new String[]{"cf=/debug-config-test.properties", "test=true"});
+        platform.initialize(new String[]{"cf=/empty-scene-test.properties", "test=true"});
     }
 
     @AfterEach
@@ -32,12 +32,12 @@ public class Platform2DPhysicProcessingTest {
             new Platform2D.World(
                 new Platform2D.Vec2d(0, 0.981),
                 new Rectangle2D.Double(0, 0, 200, 200)));
-
+        Platform2D.Scene scn = platform.getSceneManager().getActive();
         GameObject gameObject = new GameObject("go", 100, 100, 50, 50)
             .setVelocity(1, 1)
             .setAcceleration(0.5, 0.5)
             .setStaticObject(false);
-        platform.addGameObject(gameObject);
+        scn.add(gameObject);
         platform.update(16);
         Assertions.assertEquals(116.0, gameObject.x, 0.01);
         Assertions.assertEquals(117.26, gameObject.y, 0.01);
