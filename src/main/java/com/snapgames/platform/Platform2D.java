@@ -911,12 +911,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void logDebugSceneTreeNode(Node node, int level) {
 
-        debug("%s|_ node:%s", "   ".repeat(level), node.getName());
-        level += 1;
-        for (Node n : node.getChild()) {
-            debug("%s|_ node:%s", "   ".repeat(level), n.getName());
-            if (n.getChild().size() > 0) {
-                logDebugSceneTreeNode(n, level);
+        if (node != null) {
+            debug("%s|_ node:%s", "   ".repeat(level), node.getName());
+            level += 1;
+            for (Node n : node.getChild()) {
+                debug("%s|_ node:%s", "   ".repeat(level), n.getName());
+                if (n.getChild().size() > 0) {
+                    logDebugSceneTreeNode(n, level);
+                }
             }
         }
     }
