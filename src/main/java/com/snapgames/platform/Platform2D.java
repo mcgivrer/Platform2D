@@ -163,6 +163,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public Vec2d sub(Vec2d v) {
             return new Vec2d(this.x - v.x, this.y - v.y);
         }
+
+        public Vec2d substract(Vec2d v1) {
+            return new Vec2d(x - v1.x, y - v1.y);
+        }
+
+        public double length() {
+            return Math.sqrt(x * x + y * y);
+        }
+
+        public double distance(Vec2d v1) {
+            return substract(v1).length();
+        }
     }
 
     /**
@@ -188,6 +200,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * {@link Node} class provide a tree structure to the platform architecture. all the internal objects are
+     * Node with two links:  parent and child.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class Node extends Rectangle2D.Double {
         private static long index = 0;
 
@@ -196,17 +215,36 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public boolean active = true;
         public double lifespan = -1;
         public double timer = 0;
-        protected String name = "gameobject_" + id;
+        protected String name = "node" + id;
 
         protected Node parent;
 
         protected List<Node> children = new ArrayList<>();
 
+        protected List<Behavior<? extends Node>> behaviors = new ArrayList<>();
+
+        public List<Behavior<? extends Node>> getBehaviors() {
+            return behaviors;
+        }
+
+        /**
+         * Create a new {@link Node} with some geometric data
+         *
+         * @param x    the horizontal position
+         * @param y    the vertical position
+         * @param w    the width if the node
+         * @param h    the height of the node
+         * @param name the name of this node.
+         */
         public Node(double x, double y, double w, double h, String name) {
             super(x, y, w, h);
             this.name = name;
         }
 
+        /**
+         * Create a new {@link Node} with default parameter position (0,0) size (0,0) and
+         * <code>name = "node_" + internal node unique id</code>.
+         */
         public Node() {
             super();
         }
@@ -237,6 +275,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return name;
         }
 
+        /**
+         * Update the lifespan regarding target duration.
+         * <ul>
+         *     <li>if duration=-1, no effect,</li>
+         *     <li>if lifespan>duration, object is deactivated.</li>
+         * </ul>
+         * <p>
+         * by default, a {@link Node} has no duration (=-1).
+         *
+         * @param elapsed the elapsed time since previous call.
+         */
         public void update(double elapsed) {
             // Compute lifespan & Duration.
             if (lifespan != -1) {
@@ -249,6 +298,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         public boolean isActive() {
             return active;
+        }
+
+        public <T extends Node> T addBehavior(Behavior<T> b) {
+            behaviors.add(b);
+            return (T) this;
         }
     }
 
@@ -523,6 +577,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * The {@link Camera} object intends to track a {@link GameObject} target and focus on it, providing a fixed viewport for rendering.
+     * the {@link GameObject} and inheriting object can be stick to a {@link Camera}.
+     * the tracking effect is delayed according to the {@link Camera}'s tweenFactor.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
     public static class Camera extends GameObject {
         private Node target;
         private double tweenFactor;
@@ -551,18 +613,25 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                            * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                            * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                this.viewport.getHeight());
+                    this.viewport.getHeight());
 
         }
     }
 
+    /**
+     * The new {@link Scene} interface provides the required mechanism, with the help of {@link AbstractScene}
+     * to let the {@link SceneManager} switch between multiple scene in the game.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
     public interface Scene {
         String getName();
 
@@ -601,8 +670,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         void reset();
 
         GameObject getObject(int idx);
+
+        List<Behavior<? extends Node>> getBehaviors();
+
+        Platform2D getPlatform();
     }
 
+    /**
+     * The {@link AbstractScene} implements all the required object management for Scene and facilitate the {@link GameObject}
+     * processing in the game loop through the input, update and draw methods.
+     * <p>
+     * It also helps on managing the switch between 2 {@link Scene} with initialize, create, close and dispose.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static abstract class AbstractScene extends Node implements Scene {
         protected final Platform2D app;
         protected Platform2D.Camera camera;
@@ -675,8 +757,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             children.clear();
         }
 
+        public Platform2D getPlatform() {
+            return app;
+        }
+
     }
 
+    /**
+     * the {@link StartScene} is the default one when none has been defined in the configuration file.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class StartScene extends AbstractScene {
 
         public StartScene(Platform2D app) {
@@ -695,7 +787,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             // add background Image
             BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
             ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
-                .setImage(bckImage).setPriority(0);
+                    .setImage(bckImage).setPriority(0);
             add(backgroundIObj);
 
             // add welcome message
@@ -704,13 +796,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             gb.setFont(welcomeFont);
             int textWidth = gb.getFontMetrics().stringWidth(welcomeTxt);
             TextObject txtObject = (TextObject) new TextObject("welcome")
-                .setText(welcomeTxt)
-                .setShadowColor(Color.BLACK)
-                .setFont(welcomeFont)
-                .setPosition((app.getBufferSize().width - textWidth) * 0.5, app.getBufferSize().height * 0.5)
-                .setBorderColor(Color.WHITE)
-                .setPriority(1)
-                .setStaticObject(true);
+                    .setText(welcomeTxt)
+                    .setShadowColor(Color.BLACK)
+                    .setFont(welcomeFont)
+                    .setPosition((app.getBufferSize().width - textWidth) * 0.5, app.getBufferSize().height * 0.5)
+                    .setBorderColor(Color.WHITE)
+                    .setPriority(1)
+                    .setStaticObject(true);
             add(txtObject);
         }
 
@@ -720,6 +812,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The {@link SceneManager} is the internal Platform2D service dedicated to Scene management.
+     * <p>
+     * It takes care of initialization, creation of a Scene, its inpuit,update and draw phases, and finally
+     * close and dispose ot if.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class SceneManager {
         private Map<String, Scene> scenes = new HashMap<>();
         private Scene activeScene = null;
@@ -774,7 +875,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public void create() {
             if (Optional.ofNullable(activeScene).isPresent()) {
                 activeScene.create(app);
-
             }
         }
 
@@ -788,6 +888,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             if (Optional.ofNullable(activeScene).isPresent()) {
 
                 activeScene.input(app);
+                activeScene.getChild().forEach(c -> c.getBehaviors().forEach(b -> b.input(activeScene, c)));
             }
         }
 
@@ -795,6 +896,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             if (Optional.ofNullable(activeScene).isPresent()) {
 
                 activeScene.draw(app, g, stats);
+
             }
         }
 
@@ -828,6 +930,32 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public Scene getActiveScene() {
             return activeScene;
         }
+    }
+
+    /**
+     * The {@link Behavior} interface is a way to easily implement new processing for each of the <code>create</code>,
+     * <code>input</code>, <code>update</code> and <code>draw</code> operation for the {@link Node} instance taking
+     * advantage of this behavior.
+     *
+     * @param <T> The
+     */
+    public interface Behavior<T extends Node> {
+        default T create(Scene s, T parent) {
+            return null;
+        }
+
+        default void input(Scene s, Node n) {
+        }
+
+        default void update(Scene s, double elapsed, GameObject n) {
+        }
+
+        default void draw(Scene s, Graphics2D g, T n) {
+        }
+    }
+
+    public static abstract class AbstractBehavior<T extends Node> implements Behavior<T> {
+
     }
 
     /**
@@ -967,8 +1095,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(String[] args) {
         Map<String, Object> attributes = Arrays.stream(args)
-            .map(s -> s.split("="))
-            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+                .map(s -> s.split("="))
+                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
 
         parseAttributes(attributes);
     }
@@ -980,7 +1108,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(Properties props) {
         Map<String, Object> attributes = props.entrySet().stream()
-            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
         parseAttributes(attributes);
     }
 
@@ -1140,17 +1268,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-        Map<String, Object> stats,
-        long framesPerSec,
-        long updatesPerSec,
-        long gameTime,
-        double elapsed) {
+            Map<String, Object> stats,
+            long framesPerSec,
+            long updatesPerSec,
+            long gameTime,
+            double elapsed) {
         Scene scn = getSceneManager().getActiveScene();
         List<GameObject> objects = (List<GameObject>) scn.getChild();
         long countActive = objects.stream()
-            .filter(Node::isActive).count();
+                .filter(Node::isActive).count();
         long countStatic = objects.stream()
-            .filter(GameObject::isObjectStatic).count();
+                .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -1182,40 +1310,42 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Scene scn = getSceneManager().getActiveScene();
 
         scn.getChild().stream()
-            // process only active and non-static objects
-            .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
-            .forEach(n -> {
-                GameObject o = (GameObject) n;
-                // reset current GameObject acceleration
-                o.ax = 0;
-                o.ay = 0;
+                // process only active and non-static objects
+                .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
+                .forEach(n -> {
+                    GameObject o = (GameObject) n;
+                    // reset current GameObject acceleration
+                    o.ax = 0;
+                    o.ay = 0;
 
-                // apply all concerned World constraints
-                applyWorldConstraints(world, o, elapsed);
+                    // apply all concerned World constraints
+                    applyWorldConstraints(world, o, elapsed);
 
-                // add applied forces on acceleration
-                o.forces.forEach(v -> {
-                    o.ax += v.x;
-                    o.ay += v.y;
+                    // add applied forces on acceleration
+                    o.forces.forEach(v -> {
+                        o.ax += v.x;
+                        o.ay += v.y;
+                    });
+
+                    // compute resulting speed
+                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+                    // get the GameObject o position
+                    o.x += o.dx * elapsed;
+                    o.y += o.dy * elapsed;
+
+                    // apply friction "force" to the velocity
+                    o.dx *= o.material.friction;
+                    o.dy *= o.material.friction;
+
+                    o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
+                    o.update(elapsed);
+                    keepGameObjectIntoPlayArea(world, o);
+                    o.forces.clear();
+
                 });
 
-                // compute resulting speed
-                o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                // get the GameObject o position
-                o.x += o.dx * elapsed;
-                o.y += o.dy * elapsed;
-
-                // apply friction "force" to the velocity
-                o.dx *= o.material.friction;
-                o.dy *= o.material.friction;
-
-                o.update(elapsed);
-                keepGameObjectIntoPlayArea(world, o);
-                o.forces.clear();
-
-            });
         if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
             Camera camera = scnManager.getActiveScene().getCamera();
             if (Optional.ofNullable(camera).isPresent()) {
@@ -1323,15 +1453,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Scene scn = getSceneManager().getActiveScene();
 
         scn.getChild().stream()
-            .filter(Node::isActive)
-            .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
-            .forEach(o -> {
-                drawGameObject(gb, (GameObject) o);
-                drawDebugInfo(gb, (GameObject) o);
-            });
+                .filter(Node::isActive)
+                .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
+                .forEach(o -> {
+                    drawGameObject(gb, scn, (GameObject) o);
+                    drawDebugInfo(gb, (GameObject) o);
+                });
     }
 
-    private void drawGameObject(Graphics2D gb, GameObject o) {
+    private void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
         switch (o.getClass().getSimpleName()) {
             case "GameObject" -> {
                 gb.setColor(o.fillColor);
@@ -1370,7 +1500,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             default -> {
                 error("No rendering process defined for %s", o.getClass().getSimpleName());
             }
+
         }
+
+        o.getBehaviors().forEach(b -> b.input(scn, o));
     }
 
     /**
@@ -1381,12 +1514,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void displayToWindow(Map<String, Object> stats) {
         Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
         g.drawImage(buffer,
-            0, 0, screenSize.width, screenSize.height,
-            0, 0, bufferSize.width, bufferSize.height,
-            null);
+                0, 0, screenSize.width, screenSize.height,
+                0, 0, bufferSize.width, bufferSize.height,
+                null);
         g.setColor(Color.ORANGE);
         g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-            16, frame.getHeight() - 16);
+                16, frame.getHeight() - 16);
         g.dispose();
         frame.getBufferStrategy().show();
     }
@@ -1427,8 +1560,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                + ":"
-                + value;
+                    + ":"
+                    + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
@@ -1442,17 +1575,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Duration duration = Duration.ofMillis(milliseconds);
         if (duration.toDays() > 0) {
             return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
-                duration.toDays(),
-                duration.toHours() - (24 * duration.toDays()),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toDays(),
+                    duration.toHours() - (24 * duration.toDays()),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
         } else {
             return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
-                duration.toHours(),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toHours(),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
 
         }
     }
@@ -1465,7 +1598,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void drawDebugInfo(Graphics2D gb, GameObject o) {
         if (Optional.ofNullable(debugFilter).isPresent()
-            && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
+                && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
             if (debug > 0) {
                 gb.setColor(Color.ORANGE);
                 gb.setFont(gb.getFont().deriveFont(9.0f));
@@ -1486,24 +1619,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                         for (Vec2d f : o.forces) {
                             gb.setColor(Color.WHITE);
                             gb.drawLine(
-                                (int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                    (int) (o.x + (o.width * 0.5)),
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                         }
                         // draw velocity
                         gb.setColor(Color.GREEN);
                         gb.drawLine(
-                            (int) (o.x + (o.width * 0.5)),
-                            (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                         // draw Acceleration
                         gb.setColor(Color.BLUE);
                         gb.drawLine((int) (o.x + (o.width * 0.5)),
-                            (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                     }
                 }
             }
@@ -1641,9 +1774,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-            "Platform2D",
-            new Dimension(320, 200),
-            new Dimension(640, 400));
+                "Platform2D",
+                new Dimension(320, 200),
+                new Dimension(640, 400));
         platform2d.run(args);
     }
 }
