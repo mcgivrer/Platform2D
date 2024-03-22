@@ -33,7 +33,7 @@ class Platform2DConfigurationTest {
     public void loadSpecifiedConfigurationFileTest() {
         app.initialize(new String[]{"cf=/debug-config-test.properties", "app.test.mode=true"});
 
-        Assertions.assertEquals(2, app.debug);
+        Assertions.assertEquals(2, Platform2D.debug);
         Assertions.assertEquals("player,score", app.debugFilter);
         Assertions.assertEquals(320, app.buffer.getWidth());
         Assertions.assertEquals(200, app.buffer.getHeight());
@@ -45,7 +45,7 @@ class Platform2DConfigurationTest {
     public void loadConfigurationFileTest() {
         app.initialize(new String[]{"cf=/debug-config-test.properties", "app.test.mode=true"});
 
-        Assertions.assertEquals(2, app.debug);
+        Assertions.assertEquals(2, Platform2D.debug);
         Assertions.assertEquals("player,score", app.debugFilter);
         Assertions.assertEquals(320, app.buffer.getWidth());
         Assertions.assertEquals(200, app.buffer.getHeight());
@@ -57,7 +57,7 @@ class Platform2DConfigurationTest {
     public void loadDefaultConfigurationFileTest() {
         app.initialize(new String[]{"app.test.mode=true"});
 
-        Assertions.assertEquals(0, app.debug);
+        Assertions.assertEquals(0, Platform2D.debug);
         Assertions.assertEquals("", app.debugFilter);
         Assertions.assertEquals(320, app.buffer.getWidth());
         Assertions.assertEquals(200, app.buffer.getHeight());
