@@ -8,3 +8,5 @@
 /build
 /src/main/javadoc/overview.html
 out/
+
+platform2D.iml
