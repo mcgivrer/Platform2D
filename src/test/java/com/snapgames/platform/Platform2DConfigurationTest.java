@@ -28,11 +28,9 @@ class Platform2DConfigurationTest {
         Assertions.assertEquals(400, app.frame.getContentPane().getHeight());
     }
 
-
     @Test
     public void loadSpecifiedConfigurationFileTest() {
         app.initialize(new String[]{"cf=/debug-config-test.properties", "app.test.mode=true"});
-
         Assertions.assertEquals(2, app.debug);
         Assertions.assertEquals("player,score", app.debugFilter);
         Assertions.assertEquals(320, app.buffer.getWidth());

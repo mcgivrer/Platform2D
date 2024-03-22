@@ -9,16 +9,19 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The {@link Platform2D} class base of the platform framework.
@@ -90,6 +93,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         this.world = world;
     }
 
+    public World getWorld() {
+        return this.world;
+    }
+
     /**
      * The {@link Vec2d} class is a 2-dimension vector.
      *
@@ -125,7 +132,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static class Material {
 
-        public static Material DEFAULT = new Material("default", 1.0, 0.70, 0.98);
+        public static final Material DEFAULT = new Material("default", 1.0, 0.70, 0.98);
+        public static final Material RUBBER = new Material("rubber", 0.7, 0.68, 0.63);
+        public static final Material SUPER_BALL = new Material("superball", 0.7, 0.98, 0.23);
+        public static final Material WOOD = new Material("wood", 0.65, 0.20, 0.50);
+        public static final Material STEEL = new Material("steel", 1.2, 0.10, 0.12);
+        public static final Material AIR = new Material("air", 0.05, 0.0, 0.99);
+        public static final Material WATER = new Material("water", 0.95, 0.1, 0.40);
+
 
         public String name;
         public double density;
@@ -300,6 +314,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.debugOffsetY = offY;
             return this;
         }
+
+        public GameObject setSize(double w, double h) {
+            this.width = w;
+            this.height = h;
+            return this;
+        }
+
     }
 
     /**
@@ -419,7 +440,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.playArea = playAreaSize;
         }
 
-        public void addConstrain(ConstraintObject constrain) {
+        public void addConstraint(ConstraintObject constrain) {
             constrain.staticObject = true;
             constrains.add(constrain);
         }
@@ -438,6 +459,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * The {@link Camera} class provides a way to follow a {@link GameObject} target to move
+     * a view according to the target moves. The velocity of the following movement is defined by a tween factor,
+     * acting as a spring linking the {@link Camera} and the focus {@link GameObject}.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
     public static class Camera extends GameObject {
         private GameObject target;
         private double tweenFactor;
@@ -466,18 +495,59 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                            * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                            * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                this.viewport.getHeight());
+                    this.viewport.getHeight());
 
         }
     }
 
+    public static class Tile {
+        private final int width;
+        private final int height;
+        private BufferedImage image;
+
+        public Tile(int w, int h) {
+            this.width = w;
+            this.height = h;
+        }
+
+        Tile setImage(BufferedImage img) {
+            this.image = img;
+            return this;
+        }
+    }
+
+    public static class TileMap extends GameObject {
+        Tile[] tiles;
+        int[][] map;
+
+        public TileMap(String name, int w, int h) {
+            super(name);
+            map = new int[w][h];
+        }
+
+        public int getTile(int x, int y) {
+            return map[x][y];
+        }
+
+        public TileMap load(String path){
+            try {
+                Stream<String> tileMapData = Files.lines(Paths.get(path));
+                tileMapData.forEach(s->{
+                    
+                });
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return this;
+        }
+    }
 
     /**
      * The translated messages to be displayed in log or on screen.
@@ -569,17 +639,23 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     void initialize(String[] args) {
         intializeDefaultConfiguration();
         parseArguments(args);
+
         loadConfiguration(configurationFilePath);
+
         buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
-        frame = new JFrame(messages.getString("app.title"));
+
+        frame = new JFrame(getMessage("app.title"));
         setPreferredSize(screenSize);
         setMaximumSize(screenSize);
         setMinimumSize(screenSize);
+
         frame.setContentPane(this);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.addComponentListener(this);
         frame.addKeyListener(this);
+
         frame.pack();
+
         if (!testMode) {
             frame.setVisible(true);
         }
@@ -617,8 +693,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(String[] args) {
         Map<String, Object> attributes = Arrays.stream(args)
-            .map(s -> s.split("="))
-            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+                .map(s -> s.split("="))
+                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
 
         parseAttributes(attributes);
     }
@@ -630,7 +706,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(Properties props) {
         Map<String, Object> attributes = props.entrySet().stream()
-            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
         parseAttributes(attributes);
     }
 
@@ -669,52 +745,58 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void createScene() {
         // define the game World
-        world = new World(new Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
+        world = new World(
+                new Vec2d(0, 0.0981),
+                new Rectangle2D.Double(0, 0, 320, 200));
 
         BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
         ImageObject background = (ImageObject) new ImageObject("background")
-            .setImage(backgroundImg)
-            .setStaticObject(true)
-            .setPriority(-10);
+                .setImage(backgroundImg)
+                .setStaticObject(true)
+                .setPriority(-10);
         addGameObject(background);
-
 
         // add a player object
         GameObject player = new GameObject(
-            "player",
-            bufferSize.width >> 1, bufferSize.height >> 1,
-            16, 16)
-            .setMaterial(new Material("player", 1.0, 0.30, 0.92))
-            .addAttribute("energy", 100)
-            .addAttribute("mana", 100)
-            .addAttribute("lives", 3)
-            .setMass(80.0);
+                "player")
+                .setPosition(bufferSize.width >> 1, bufferSize.height >> 1)
+                .setSize(16, 16)
+                .setMaterial(new Material("player", 1.0, 0.30, 0.92))
+                .addAttribute("energy", 100)
+                .addAttribute("mana", 100)
+                .addAttribute("lives", 3)
+                .setMass(80.0);
         addGameObject(player);
 
         createHUD(player);
 
         // Add some constraining object.
-        ConstraintObject water = (ConstraintObject) new ConstraintObject("water",
-            0,
-            world.getPlayArea().getHeight() * 0.70,
-            world.getPlayArea().getWidth(),
-            world.getPlayArea().getHeight() * 0.30)
-            .setPriority(2)
-            .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
-            .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
-            .addForce(new Vec2d(0, -0.3));
-        addGameObject(water);
+        ConstraintObject waterConstraint =
+                (ConstraintObject) new ConstraintObject("water",
+                        0,
+                        world.getPlayArea().getHeight() * 0.70,
+                        world.getPlayArea().getWidth(),
+                        world.getPlayArea().getHeight() * 0.30)
+                        .setPriority(2)
+                        .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
+                        .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
+                        .setMaterial(Material.WATER)
+                        .addForce(new Vec2d(0, -0.37));
 
-        world.addConstrain(water);
+        addGameObject(waterConstraint);
+
+        world.addConstraint(waterConstraint);
 
         // add some enemies
-        addEnemies(10);
+        addEnemies(10, Material.WOOD);
 
         setCamera(new Camera("cam01")
-            .setTarget(player)
-            .setTweenFactor(0.05)
-            .setViewport(new Rectangle2D.Double(0, 0, bufferSize.getWidth(), bufferSize.getHeight())));
-
+                .setTarget(player)
+                .setTweenFactor(0.05)
+                .setViewport(
+                        new Rectangle2D.Double(
+                                0, 0,
+                                bufferSize.getWidth(), bufferSize.getHeight())));
     }
 
     private void setCamera(Camera cam) {
@@ -723,35 +805,35 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     private void createHUD(GameObject player) {
         TextObject score = (TextObject) new TextObject("score")
-            .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
-            .setText("000000")
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(8, 16)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(1)
-            .setStaticObject(true)
-            .setStickToCamera(true);
+                .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
+                .setText("000000")
+                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+                .setPosition(8, 16)
+                .setFillColor(Color.WHITE)
+                .setBorderColor(Color.BLACK)
+                .setPriority(1)
+                .setStaticObject(true)
+                .setStickToCamera(true);
         addGameObject(score);
 
         BufferedImage heartImage = ((BufferedImage) getResource("/assets/images/tiles01.png|0,96,16,16"));
         ImageObject heart = (ImageObject) new ImageObject("heart")
-            .setImage(heartImage)
-            .setPosition(bufferSize.width - 32, 16)
-            .setPriority(1)
-            .setStaticObject(true)
-            .setStickToCamera(true);
+                .setImage(heartImage)
+                .setPosition(bufferSize.width - 32, 16)
+                .setPriority(1)
+                .setStaticObject(true)
+                .setStickToCamera(true);
 
         TextObject lifes = (TextObject) new TextObject("lives")
-            .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
-            .setText("" + (player.attributes.get("lives")))
-            .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-            .setPosition(bufferSize.width - 24, 20)
-            .setFillColor(Color.WHITE)
-            .setBorderColor(Color.BLACK)
-            .setPriority(2)
-            .setStaticObject(true)
-            .setStickToCamera(true);
+                .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
+                .setText("" + (player.attributes.get("lives")))
+                .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
+                .setPosition(bufferSize.width - 24, 20)
+                .setFillColor(Color.WHITE)
+                .setBorderColor(Color.BLACK)
+                .setPriority(2)
+                .setStaticObject(true)
+                .setStickToCamera(true);
         addGameObject(heart);
         addGameObject(lifes);
     }
@@ -798,6 +880,49 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return resources.get(path);
     }
 
+    /**
+     * Retrieve a specific message from the translation according to its message key.
+     *
+     * @param keyMsg the key of the message in the translation files
+     * @return the corresponding translated message.
+     */
+    public String getMessage(String keyMsg) {
+        return replaceTemplate(messages.getString(keyMsg), messages);
+    }
+
+    /**
+     * Process template text to replace "${specific.key}" by their translated values.
+     *
+     * @param template the template text to be parsed and where keys must be translated.
+     * @param values   the list of translated keys/values.
+     * @return the key translated resulting message.
+     */
+    public static String replaceTemplate(String template, ResourceBundle values) {
+        StringTokenizer tokenizer = new StringTokenizer(template, "${}", true);
+        StringJoiner joiner = new StringJoiner("");
+        while (tokenizer.hasMoreTokens()) {
+            String token = tokenizer.nextToken();
+            if (token.equals("$")) {
+                if (tokenizer.hasMoreTokens()) {
+                    token = tokenizer.nextToken();
+
+                    if (token.equals("{") && tokenizer.hasMoreTokens()) {
+                        String key = tokenizer.nextToken();
+
+                        if (tokenizer.hasMoreTokens() && tokenizer.nextToken().equals("}")) {
+                            String value = values.containsKey(key) ? values.getString(key) : "${" + key + "}";
+                            joiner.add(value);
+                        }
+                    }
+                }
+            } else {
+                joiner.add(token);
+            }
+        }
+        return joiner.toString();
+    }
+
+
     private static void loadAndOrSliceImageFrom(String path) {
         try {
             if (path.contains("|")) {
@@ -818,20 +943,22 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
-    private void addEnemies(int nbEnemies) {
+    private void addEnemies(int nbEnemies, Material material) {
         for (int i = 0; i < nbEnemies; i++) {
             // add a player object
             GameObject enemy = new GameObject(
-                "enemy_" + i,
-                Math.random() * bufferSize.width, Math.random() * bufferSize.height,
-                8, 8)
-                .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
-                .setFillColor(Color.BLUE)
-                .setBorderColor(Color.DARK_GRAY)
-                .addAttribute("energy", 100)
-                .addAttribute("mana", 100)
-                .setPriority(10 + i)
-                .setMass(10.0);
+                    "enemy_" + i,
+                    Math.random() * bufferSize.width,
+                    Math.random() * bufferSize.height,
+                    8, 8)
+                    .setMaterial(new Material("enemy", 0.7, 0.80, 0.99))
+                    .setFillColor(Color.BLUE)
+                    .setBorderColor(Color.DARK_GRAY)
+                    .addAttribute("energy", 100)
+                    .addAttribute("mana", 100)
+                    .setMaterial(material)
+                    .setPriority(10 + i)
+                    .setMass(10.0);
             addGameObject(enemy);
         }
     }
@@ -901,16 +1028,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-        Map<String, Object> stats,
-        long framesPerSec,
-        long updatesPerSec,
-        long gameTime,
-        double elapsed) {
+            Map<String, Object> stats,
+            long framesPerSec,
+            long updatesPerSec,
+            long gameTime,
+            double elapsed) {
 
         long countActive = objects.stream()
-            .filter(GameObject::isActive).count();
+                .filter(GameObject::isActive).count();
         long countStatic = objects.stream()
-            .filter(GameObject::isObjectStatic).count();
+                .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -954,39 +1081,39 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     void update(double elapsed) {
         objects.stream()
-            // process only active and non-static objects
-            .filter(o -> !o.staticObject && o.active)
-            .forEach(o -> {
-                // reset current GameObject acceleration
-                o.ax = 0;
-                o.ay = 0;
+                // process only active and non-static objects
+                .filter(o -> !o.staticObject && o.active)
+                .forEach(o -> {
+                    // reset current GameObject acceleration
+                    o.ax = 0;
+                    o.ay = 0;
 
-                // apply all concerned World constraints
-                applyWorldConstraints(world, o, elapsed);
+                    // apply all concerned World constraints
+                    applyWorldConstraints(world, o, elapsed);
 
-                // add applied forces on acceleration
-                o.forces.forEach(v -> {
-                    o.ax += v.x;
-                    o.ay += v.y;
+                    // add applied forces on acceleration
+                    o.forces.forEach(v -> {
+                        o.ax += v.x;
+                        o.ay += v.y;
+                    });
+
+                    // compute resulting speed
+                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+                    // get the GameObject o position
+                    o.x += o.dx * elapsed;
+                    o.y += o.dy * elapsed;
+
+                    // apply friction "force" to the velocity
+                    o.dx *= o.material.friction;
+                    o.dy *= o.material.friction;
+
+                    o.update(elapsed);
+                    keepGameObjectIntoPlayArea(world, o);
+                    o.forces.clear();
+
                 });
-
-                // compute resulting speed
-                o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                // get the GameObject o position
-                o.x += o.dx * elapsed;
-                o.y += o.dy * elapsed;
-
-                // apply friction "force" to the velocity
-                o.dx *= o.material.friction;
-                o.dy *= o.material.friction;
-
-                o.update(elapsed);
-                keepGameObjectIntoPlayArea(world, o);
-                o.forces.clear();
-
-            });
         if (Optional.ofNullable(camera).isPresent()) {
             camera.update(elapsed);
         }
@@ -1082,12 +1209,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
         objects.stream()
-            .filter(GameObject::isActive)
-            .filter(o -> o.getStickToCamera() == stickToCamera)
-            .forEach(o -> {
-                drawGameObject(gb, o);
-                drawDebugInfo(o, gb);
-            });
+                .filter(GameObject::isActive)
+                .filter(o -> o.getStickToCamera() == stickToCamera)
+                .forEach(o -> {
+                    drawGameObject(gb, o);
+                    drawDebugInfo(o, gb);
+                });
     }
 
     private void drawGameObject(Graphics2D gb, GameObject o) {
@@ -1140,12 +1267,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private void displayToWindow(Map<String, Object> stats) {
         Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
         g.drawImage(buffer,
-            0, 0, screenSize.width, screenSize.height,
-            0, 0, bufferSize.width, bufferSize.height,
-            null);
+                0, 0, screenSize.width, screenSize.height,
+                0, 0, bufferSize.width, bufferSize.height,
+                null);
         g.setColor(Color.ORANGE);
         g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-            16, frame.getHeight() - 16);
+                16, frame.getHeight() - 16);
         g.dispose();
         frame.getBufferStrategy().show();
     }
@@ -1186,8 +1313,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                + ":"
-                + value;
+                    + ":"
+                    + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
@@ -1201,17 +1328,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Duration duration = Duration.ofMillis(milliseconds);
         if (duration.toDays() > 0) {
             return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
-                duration.toDays(),
-                duration.toHours() - (24 * duration.toDays()),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toDays(),
+                    duration.toHours() - (24 * duration.toDays()),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
         } else {
             return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
-                duration.toHours(),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toHours(),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
 
         }
     }
@@ -1224,7 +1351,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void drawDebugInfo(GameObject o, Graphics2D gb) {
         if (Optional.ofNullable(debugFilter).isPresent()
-            && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
+                && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
             if (debug > 0) {
                 gb.setColor(Color.ORANGE);
                 gb.setFont(gb.getFont().deriveFont(9.0f));
@@ -1245,24 +1372,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                         for (Vec2d f : o.forces) {
                             gb.setColor(Color.WHITE);
                             gb.drawLine(
-                                (int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                    (int) (o.x + (o.width * 0.5)),
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                         }
                         // draw velocity
                         gb.setColor(Color.GREEN);
                         gb.drawLine(
-                            (int) (o.x + (o.width * 0.5)),
-                            (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                         // draw Acceleration
                         gb.setColor(Color.BLUE);
                         gb.drawLine((int) (o.x + (o.width * 0.5)),
-                            (int) (o.y + (o.height * 0.5)),
-                            (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                            (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                     }
                 }
             }
@@ -1322,7 +1449,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 if (e.isShiftDown()) {
                     nb *= 5;
                 }
-                addEnemies(nb);
+                addEnemies(nb, Material.WOOD);
             }
             default -> {
                 // Nothing to do !
@@ -1391,9 +1518,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-            "Platform2D",
-            new Dimension(320, 200),
-            new Dimension(640, 400));
+                "Platform2D",
+                new Dimension(320, 200),
+                new Dimension(640, 400));
         platform2d.run(args);
     }
 }

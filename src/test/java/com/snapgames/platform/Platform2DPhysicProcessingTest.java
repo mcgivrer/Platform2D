@@ -26,21 +26,52 @@ public class Platform2DPhysicProcessingTest {
 
     @Test
     public void testGameObjectsUpdatedAndMovedCorrectly() {
-        platform.setWorld(
-            new Platform2D.World(
-                new Platform2D.Vec2d(0, 0.981),
-                new Rectangle2D.Double(0, 0, 200, 200)));
 
-        Platform2D.GameObject gameObject = new Platform2D.GameObject("go", 100, 100, 50, 50)
-            .setVelocity(1, 1)
-            .setAcceleration(0.5, 0.5)
-            .setStaticObject(false);
+        platform.setWorld(
+                new Platform2D.World(
+                        new Platform2D.Vec2d(0, 0.981),
+                        new Rectangle2D.Double(0, 0, 200, 200)));
+
+        Platform2D.GameObject gameObject =
+                new Platform2D.GameObject("go00", 100, 100, 50, 50)
+                        .setVelocity(1, 1)
+                        .setStaticObject(false)
+                        .addForce(new Platform2D.Vec2d(0.5, 0.5));
         platform.addGameObject(gameObject);
         platform.update(16);
-        Assertions.assertEquals(116.0, gameObject.x, 0.01);
-        Assertions.assertEquals(117.26, gameObject.y, 0.01);
-        platform.dispose();
+
+        Assertions.assertEquals(116.64, gameObject.x, 0.01);
+        Assertions.assertEquals(117.89, gameObject.y, 0.01);
+
     }
 
+    @Test
+    public void testGameObjectsUpdatedAndMovedCorrectlyWithConstraintObject() {
+
+        platform.setWorld(
+                new Platform2D.World(
+                        new Platform2D.Vec2d(0, 0.981),
+                        new Rectangle2D.Double(0, 0, 200, 200)));
+
+        Platform2D.ConstraintObject co = (Platform2D.ConstraintObject) new Platform2D.ConstraintObject("constraint")
+                .setPosition(0.0, 0.0)
+                .setSize(200, 100)
+                .setMaterial(Platform2D.Material.WOOD);
+        platform.getWorld().addConstraint(co);
+
+        Platform2D.GameObject gameObject =
+                new Platform2D.GameObject("go00", 100, 100, 50, 50)
+                        .setVelocity(1, 1)
+                        .setStaticObject(false)
+                        .addForce(new Platform2D.Vec2d(0.5, 0.5));
+        platform.addGameObject(gameObject);
+
+
+        platform.update(16);
+
+        Assertions.assertEquals(116.64, gameObject.x, 0.01);
+        Assertions.assertEquals(117.89, gameObject.y, 0.01);
+
+    }
 
 }
