@@ -1,9 +1,10 @@
-package com.snapgames.platform.demo;
+package com.snapgames.demo;
 
+import com.snapgames.demo.behaviors.EnemyBehavior;
+import com.snapgames.demo.behaviors.PlayerBehavior;
 import com.snapgames.platform.Platform2D;
 import com.snapgames.platform.Platform2D.GameObject;
-import com.snapgames.platform.demo.behaviors.EnemyBehavior;
-import com.snapgames.platform.demo.behaviors.PlayerBehavior;
+import com.snapgames.platform.Platform2D.ParticleSystem;
 
 import java.awt.*;
 import java.awt.event.KeyEvent;
@@ -70,8 +71,24 @@ public class DemoScene extends Platform2D.AbstractScene {
 
         world.addConstrain(water);
 
+        ParticleSystem ps = new ParticleSystem("ps01").setMaxNbParticles(200).addBehavior(new Platform2D.ParticleBehavior<ParticleSystem>() {
+            @Override
+            public GameObject create(Platform2D.Scene s, GameObject o) {
+                Rectangle2D pa = s.getWorld().getPlayArea();
+                GameObject particle = new GameObject(o.getName() + "-" + o.getNextIndex())
+                        .setPosition(
+                                pa.getWidth() * Math.random(),
+                                pa.getHeight() * Math.random())
+                        .setSize(1,1)
+                        .setBorderColor(Color.WHITE)
+                        .setStaticObject(true);
+
+                return particle;
+            }
+        });
+
         // add some enemies
-        addEnemies(app,  player, 10);
+        addEnemies(app, player, 10);
 
         setCamera(new Platform2D.Camera("cam01")
                 .setTarget(player)

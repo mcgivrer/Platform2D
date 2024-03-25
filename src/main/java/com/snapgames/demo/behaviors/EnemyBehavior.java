@@ -1,4 +1,4 @@
-package com.snapgames.platform.demo.behaviors;
+package com.snapgames.demo.behaviors;
 
 import com.snapgames.platform.Platform2D;
 

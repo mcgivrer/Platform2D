@@ -1,6 +1,6 @@
 package com.snapgames.platform;
 
-import com.snapgames.platform.demo.DemoScene;
+import com.snapgames.demo.DemoScene;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -304,6 +304,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             behaviors.add(b);
             return (T) this;
         }
+
+        public long getNextIndex() {
+            return index + 1;
+        }
     }
 
     /**
@@ -427,13 +431,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return dbgInfo;
         }
 
-        protected Node setDebugOffsetY(int offY) {
+        protected GameObject setDebugOffsetY(int offY) {
             this.debugOffsetY = offY;
             return this;
         }
 
         public boolean isStaticObject() {
             return staticObject;
+        }
+
+        public GameObject setSize(int w, int h) {
+            setRect(x, y, w, h);
+            return this;
         }
     }
 
@@ -534,6 +543,31 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public ConstraintObject setForce(Vec2d f) {
             forces.clear();
             forces.add(f);
+            return this;
+        }
+    }
+
+    public static class ParticleSystem extends GameObject {
+        int nbParticles = 0;
+        int chunk = 10;
+
+        public ParticleSystem(String name) {
+            super(name);
+        }
+
+        @Override
+        public void update(double elapsed) {
+            if (nbParticles > children.size()) {
+                for (int i = 0; i < chunk; i++) {
+                    behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b ->
+                            ((ParticleBehavior<? extends Node>) b).create((Scene) this.parent, this));
+                }
+            }
+        }
+
+        public ParticleSystem setMaxNbParticles(int nbMaxParticles) {
+            this.nbParticles = nbMaxParticles;
+            this.children = new ArrayList<>();
             return this;
         }
     }
@@ -674,6 +708,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         List<Behavior<? extends Node>> getBehaviors();
 
         Platform2D getPlatform();
+
+        World getWorld();
     }
 
     /**
@@ -761,6 +797,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return app;
         }
 
+        @Override
+        public World getWorld() {
+            return app.world;
+        }
     }
 
     /**
@@ -953,6 +993,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     public static abstract class AbstractBehavior<T extends Node> implements Behavior<T> {
 
+    }
+
+    public interface ParticleBehavior<T extends Node> extends Behavior<T> {
+        default GameObject create(Scene s, GameObject o) {
+            return null;
+        }
     }
 
     /**
