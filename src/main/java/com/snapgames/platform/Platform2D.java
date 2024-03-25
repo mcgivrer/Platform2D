@@ -940,9 +940,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param <T> The
      */
     public interface Behavior<T extends Node> {
-        default T create(Scene s, T parent) {
-            return null;
-        }
 
         default void input(Scene s, Node n) {
         }
