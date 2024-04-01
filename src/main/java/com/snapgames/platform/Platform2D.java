@@ -1259,6 +1259,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         dispose();
     }
 
+    /**
+     * The main game loop.
+     */
     private void loop() {
         long frames = 0, framesPerSec = 0;
         long updates = 0, updatesPerSec = 0;
@@ -1330,9 +1333,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         stats.put("5:ups", updatesPerSec);
         stats.put("6:time", formatDuration(gameTime, false));
         stats.put("6:elps", elapsed);
-
     }
 
+    /**
+     * Retrieve the current {@link SceneManager} instance.
+     *
+     * @return the current {@link SceneManager} instance.
+     */
     public SceneManager getSceneManager() {
         return scnManager;
     }
@@ -1491,6 +1498,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         displayToWindow(stats);
     }
 
+    /**
+     * Draw all entities
+     *
+     * @param gb            the Graphics API
+     * @param stickToCamera define if entities must be moved with the {@link Camera} offset.
+     */
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
         Scene scn = getSceneManager().getActiveScene();
@@ -1504,6 +1517,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 });
     }
 
+    /**
+     * Draw the {@link GameObject} <code>o</code> from the scene <code>scn</code>
+     * using the {@link Graphics2D} API <code>gb</code>.
+     *
+     * <p>The drawing method depends on the real nature  of the object (its class).</p>
+     *
+     * <blockquote><em><strong>TODO</strong> A possible evolution consists in replacing the specific internal implementation with an
+     * extensible plugin pattern. See <a href="https://github.com/mcgivrer/Platform2D/issues/4">issue #4</a>.</em></blockquote>
+     *
+     * @param gb  the Graphics API
+     * @param scn the {@link Scene} parent of the {@link GameObject}.
+     * @param o   the {@link GameObject} to be drawn.
+     */
     private void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
         switch (o.getClass().getSimpleName()) {
             case "GameObject" -> {

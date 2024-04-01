@@ -51,6 +51,7 @@ public class DemoScene extends Platform2D.AbstractScene {
                 .addAttribute("energy", 100)
                 .addAttribute("mana", 100)
                 .addAttribute("lives", 3)
+                .addAttribute("speed", 0.3)
                 .setMass(80.0)
                 .addBehavior(new PlayerBehavior());
         add(player);
