@@ -1131,28 +1131,30 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             Scene start = new StartScene(this);
             setWorld(new World());
             scnManager.add(start);
-
         }
-        // activate the default scene
-
+        // Activate the default scene
         scnManager.activate(defaultSceneName);
         logDebugSceneTreeNode((Node) scnManager.getActive(), 0);
     }
 
+    /**
+     * trace content of the Scene tree structure.
+     *
+     * @param node  the Starting point of the tree parsing
+     * @param level the depth of parsing.
+     */
     private void logDebugSceneTreeNode(Node node, int level) {
-
         if (node != null) {
             debug("%s|_ node:%s", "   ".repeat(level), node.getName());
             level += 1;
             for (Node n : node.getChild()) {
                 debug("%s|_ node:%s", "   ".repeat(level), n.getName());
-                if (n.getChild().size() > 0) {
+                if (!n.getChild().isEmpty()) {
                     logDebugSceneTreeNode(n, level);
                 }
             }
         }
     }
-
 
     public static String getMessage(String key) {
         return messages.getString(key);
@@ -1168,7 +1170,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
             config.put("app.test.mode", "false");
         }
-
     }
 
     protected void loadScenes() {
@@ -1199,7 +1200,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Map<String, Object> attributes = Arrays.stream(args)
                 .map(s -> s.split("="))
                 .collect(Collectors.toMap(split -> split[0], split -> split[1]));
-
         parseAttributes(attributes);
     }
 
@@ -1221,11 +1221,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param attributes the map of (key,value) to feed the configuration.
      */
     private void parseAttributes(Map<String, Object> attributes) {
-        if (attributes.size() > 0) {
+        if (!attributes.isEmpty()) {
             for (Map.Entry<String, Object> entry : attributes.entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
-// Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
+                // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
                 switch (key) {
                     case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
                     case "app.screen.size", "buffer", "b" -> {
@@ -1291,23 +1291,33 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return resources.get(path);
     }
 
+    /**
+     * Load and slice image according to the path and the following parameters (pattern [\x,y,width,height]).
+     *
+     * @param path the path to the resource with optional attribute.
+     *             For image, it can be the slicing operation at [\x,y,width,height].
+     */
     private static void loadAndOrSliceImageFrom(String path) {
-        try {
-            if (path.contains("|")) {
-                //required to extract path or the image file.
-                String parts[] = path.substring(path.lastIndexOf("|") + 1).split(",");
-                int px = Integer.parseInt(parts[0]);
-                int py = Integer.parseInt(parts[1]);
-                int pw = Integer.parseInt(parts[2]);
-                int ph = Integer.parseInt(parts[3]);
-                String realPath = path.substring(0, path.lastIndexOf("|"));
-                BufferedImage img = ImageIO.read(Platform2D.class.getResourceAsStream(realPath));
-                resources.put(path, img.getSubimage(px, py, pw, ph));
-            } else {
-                resources.put(path, ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(path))));
+        if (Optional.ofNullable(path).isPresent()) {
+            try {
+                if (path.contains("|")) {
+                    //required to extract path or the image file.
+                    String[] parts = path.substring(path.lastIndexOf("|") + 1).split(",");
+                    int px = Integer.parseInt(parts[0]);
+                    int py = Integer.parseInt(parts[1]);
+                    int pw = Integer.parseInt(parts[2]);
+                    int ph = Integer.parseInt(parts[3]);
+                    String realPath = path.substring(0, path.lastIndexOf("|"));
+                    BufferedImage img = ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(realPath)));
+                    resources.put(path, img.getSubimage(px, py, pw, ph));
+                } else {
+                    resources.put(path, ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(path))));
+                }
+            } catch (IOException e) {
+                error("Unable to read Image resource: %s", e.getMessage());
             }
-        } catch (IOException e) {
-            error("Unable to read Image resource " + e.getMessage());
+        } else {
+            error("resource path is null !");
         }
     }
 
