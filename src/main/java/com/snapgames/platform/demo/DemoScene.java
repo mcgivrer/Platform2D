@@ -25,6 +25,13 @@ public class DemoScene extends Platform2D.AbstractScene {
     }
 
     @Override
+    public void load(Platform2D app){
+        app.getSoundManager().loadSound("clic","/assets/audio/clic.wav");
+        app.getSoundManager().loadSound("tic","/assets/audio/tic.wav");
+        app.getSoundManager().loadSound("toc","/assets/audio/toc.wav");
+    }
+
+    @Override
     public void create(Platform2D app) {
         // define the game World
         Platform2D.World world = new Platform2D.World(new Platform2D.Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
@@ -74,6 +81,7 @@ public class DemoScene extends Platform2D.AbstractScene {
             .setTweenFactor(0.05)
             .setViewport(new Rectangle2D.Double(0, 0, app.getBufferSize().getWidth(), app.getBufferSize().getHeight())));
 
+        app.getSoundManager().playSound("toc");
     }
 
 
