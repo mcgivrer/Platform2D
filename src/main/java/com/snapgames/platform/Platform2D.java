@@ -164,6 +164,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public Vec2d sub(Vec2d v) {
             return new Vec2d(this.x - v.x, this.y - v.y);
         }
+
+        public Vec2d substract(Vec2d v1) {
+            return new Vec2d(x - v1.x, y - v1.y);
+        }
+
+        public double length() {
+            return Math.sqrt(x * x + y * y);
+        }
+
+        public double distance(Vec2d v1) {
+            return substract(v1).length();
+        }
     }
 
     /**
@@ -189,6 +201,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * {@link Node} class provide a tree structure to the platform architecture. all the internal objects are
+     * Node with two links:  parent and child.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class Node extends Rectangle2D.Double {
         private static long index = 0;
 
@@ -197,17 +216,36 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public boolean active = true;
         public double lifespan = -1;
         public double timer = 0;
-        protected String name = "gameobject_" + id;
+        protected String name = "node" + id;
 
         protected Node parent;
 
         protected List<Node> children = new ArrayList<>();
 
+        protected List<Behavior<? extends Node>> behaviors = new ArrayList<>();
+
+        public List<Behavior<? extends Node>> getBehaviors() {
+            return behaviors;
+        }
+
+        /**
+         * Create a new {@link Node} with some geometric data
+         *
+         * @param x    the horizontal position
+         * @param y    the vertical position
+         * @param w    the width if the node
+         * @param h    the height of the node
+         * @param name the name of this node.
+         */
         public Node(double x, double y, double w, double h, String name) {
             super(x, y, w, h);
             this.name = name;
         }
 
+        /**
+         * Create a new {@link Node} with default parameter position (0,0) size (0,0) and
+         * <code>name = "node_" + internal node unique id</code>.
+         */
         public Node() {
             super();
         }
@@ -238,6 +276,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return name;
         }
 
+        /**
+         * Update the lifespan regarding target duration.
+         * <ul>
+         *     <li>if duration=-1, no effect,</li>
+         *     <li>if lifespan>duration, object is deactivated.</li>
+         * </ul>
+         * <p>
+         * by default, a {@link Node} has no duration (=-1).
+         *
+         * @param elapsed the elapsed time since previous call.
+         */
         public void update(double elapsed) {
             // Compute lifespan & Duration.
             if (lifespan != -1) {
@@ -250,6 +299,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         public boolean isActive() {
             return active;
+        }
+
+        public <T extends Node> T addBehavior(Behavior<T> b) {
+            behaviors.add(b);
+            return (T) this;
+        }
+
+        public long getNextIndex() {
+            return index + 1;
         }
     }
 
@@ -374,13 +432,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return dbgInfo;
         }
 
-        protected Node setDebugOffsetY(int offY) {
+        protected GameObject setDebugOffsetY(int offY) {
             this.debugOffsetY = offY;
             return this;
         }
 
         public boolean isStaticObject() {
             return staticObject;
+        }
+
+        public GameObject setSize(int w, int h) {
+            setRect(x, y, w, h);
+            return this;
         }
     }
 
@@ -485,6 +548,31 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    public static class ParticleSystem extends GameObject {
+        int nbParticles = 0;
+        int chunk = 10;
+
+        public ParticleSystem(String name) {
+            super(name);
+        }
+
+        @Override
+        public void update(double elapsed) {
+            if (nbParticles > children.size()) {
+                for (int i = 0; i < chunk; i++) {
+                    behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b ->
+                            ((ParticleBehavior<? extends Node>) b).create((Scene) this.parent, this));
+                }
+            }
+        }
+
+        public ParticleSystem setMaxNbParticles(int nbMaxParticles) {
+            this.nbParticles = nbMaxParticles;
+            this.children = new ArrayList<>();
+            return this;
+        }
+    }
+
     /**
      * A {@link World} entity to host gravity and play area and the world containing objects.
      *
@@ -524,6 +612,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * The {@link Camera} object intends to track a {@link GameObject} target and focus on it, providing a fixed viewport for rendering.
+     * the {@link GameObject} and inheriting object can be stick to a {@link Camera}.
+     * the tracking effect is delayed according to the {@link Camera}'s tweenFactor.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
     public static class Camera extends GameObject {
         private Node target;
         private double tweenFactor;
@@ -564,6 +660,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The new {@link Scene} interface provides the required mechanism, with the help of {@link AbstractScene}
+     * to let the {@link SceneManager} switch between multiple scene in the game.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
     public interface Scene {
         String getName();
 
@@ -606,8 +709,22 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         GameObject getObject(int idx);
 
+        List<Behavior<? extends Node>> getBehaviors();
+
+        Platform2D getPlatform();
+
+        World getWorld();
     }
 
+    /**
+     * The {@link AbstractScene} implements all the required object management for Scene and facilitate the {@link GameObject}
+     * processing in the game loop through the input, update and draw methods.
+     * <p>
+     * It also helps on managing the switch between 2 {@link Scene} with initialize, create, close and dispose.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static abstract class AbstractScene extends Node implements Scene {
         protected final Platform2D app;
         protected Platform2D.Camera camera;
@@ -677,8 +794,22 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             children.clear();
         }
 
+        public Platform2D getPlatform() {
+            return app;
+        }
+
+        @Override
+        public World getWorld() {
+            return app.world;
+        }
     }
 
+    /**
+     * the {@link StartScene} is the default one when none has been defined in the configuration file.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class StartScene extends AbstractScene {
 
         public StartScene(Platform2D app) {
@@ -722,6 +853,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The {@link SceneManager} is the internal Platform2D service dedicated to Scene management.
+     * <p>
+     * It takes care of initialization, creation of a Scene, its inpuit,update and draw phases, and finally
+     * close and dispose ot if.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class SceneManager {
         private Map<String, Scene> scenes = new HashMap<>();
         private Scene activeScene = null;
@@ -768,7 +908,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 activeScene = scenes.get(sName);
                 if (Optional.ofNullable(activeScene).isPresent()) {
                     activeScene.initialize(app);
-                    activeScene.load(app);
                     activeScene.create(app);
                 }
             }
@@ -777,7 +916,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public void create() {
             if (Optional.ofNullable(activeScene).isPresent()) {
                 activeScene.create(app);
-
             }
         }
 
@@ -791,6 +929,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             if (Optional.ofNullable(activeScene).isPresent()) {
 
                 activeScene.input(app);
+                activeScene.getChild().forEach(c -> c.getBehaviors().forEach(b -> b.input(activeScene, c)));
             }
         }
 
@@ -798,6 +937,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             if (Optional.ofNullable(activeScene).isPresent()) {
 
                 activeScene.draw(app, g, stats);
+
             }
         }
 
@@ -830,6 +970,35 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         public Scene getActiveScene() {
             return activeScene;
+        }
+    }
+
+    /**
+     * The {@link Behavior} interface is a way to easily implement new processing for each of the <code>create</code>,
+     * <code>input</code>, <code>update</code> and <code>draw</code> operation for the {@link Node} instance taking
+     * advantage of this behavior.
+     *
+     * @param <T> The
+     */
+    public interface Behavior<T extends Node> {
+
+        default void input(Scene s, Node n) {
+        }
+
+        default void update(Scene s, double elapsed, GameObject n) {
+        }
+
+        default void draw(Scene s, Graphics2D g, T n) {
+        }
+    }
+
+    public static abstract class AbstractBehavior<T extends Node> implements Behavior<T> {
+
+    }
+
+    public interface ParticleBehavior<T extends Node> extends Behavior<T> {
+        default GameObject create(Scene s, GameObject o) {
+            return null;
         }
     }
 
@@ -1149,6 +1318,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         dispose();
     }
 
+    /**
+     * The main game loop.
+     */
     private void loop() {
         long frames = 0, framesPerSec = 0;
         long updates = 0, updatesPerSec = 0;
@@ -1173,6 +1345,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 cumulatedTime = 0;
                 frames = 0;
                 updates = 0;
+            }
+            if (cumulatedTime % 333 == 0) {
                 updateStats(stats, framesPerSec, updatesPerSec, gameTime, elapsed);
             }
             if (drawFlag) {
@@ -1223,6 +1397,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * Retrieve the current {@link SceneManager} instance.
+     *
+     * @return the current {@link SceneManager} instance.
+     */
     public SceneManager getSceneManager() {
         return scnManager;
     }
@@ -1272,11 +1451,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                     o.dx *= o.material.friction;
                     o.dy *= o.material.friction;
 
+                    o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
                     o.update(elapsed);
                     keepGameObjectIntoPlayArea(world, o);
                     o.forces.clear();
 
                 });
+
         if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
             Camera camera = scnManager.getActiveScene().getCamera();
             if (Optional.ofNullable(camera).isPresent()) {
@@ -1379,6 +1560,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         displayToWindow(stats);
     }
 
+    /**
+     * Draw all entities
+     *
+     * @param gb            the Graphics API
+     * @param stickToCamera define if entities must be moved with the {@link Camera} offset.
+     */
     private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
         // draw all the platform game's scene.
         Scene scn = getSceneManager().getActiveScene();
@@ -1387,12 +1574,25 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 .filter(Node::isActive)
                 .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
                 .forEach(o -> {
-                    drawGameObject(gb, (GameObject) o);
+                    drawGameObject(gb, scn, (GameObject) o);
                     drawDebugInfo(gb, (GameObject) o);
                 });
     }
 
-    private void drawGameObject(Graphics2D gb, GameObject o) {
+    /**
+     * Draw the {@link GameObject} <code>o</code> from the scene <code>scn</code>
+     * using the {@link Graphics2D} API <code>gb</code>.
+     *
+     * <p>The drawing method depends on the real nature  of the object (its class).</p>
+     *
+     * <blockquote><em><strong>TODO</strong> A possible evolution consists in replacing the specific internal implementation with an
+     * extensible plugin pattern. See <a href="https://github.com/mcgivrer/Platform2D/issues/4">issue #4</a>.</em></blockquote>
+     *
+     * @param gb  the Graphics API
+     * @param scn the {@link Scene} parent of the {@link GameObject}.
+     * @param o   the {@link GameObject} to be drawn.
+     */
+    private void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
         switch (o.getClass().getSimpleName()) {
             case "GameObject" -> {
                 gb.setColor(o.fillColor);
@@ -1431,7 +1631,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             default -> {
                 error("No rendering process defined for %s", o.getClass().getSimpleName());
             }
+
         }
+
+        o.getBehaviors().forEach(b -> b.input(scn, o));
     }
 
     /**
