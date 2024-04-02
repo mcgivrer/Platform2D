@@ -858,7 +858,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             scenes.put(s.getName(), s);
         }
 
-        private void activate(String sName) {
+        public void activate(String sName) {
             if (!scenes.isEmpty()) {
                 if (Optional.ofNullable(activeScene).isPresent()) {
                     activeScene.close(app);
