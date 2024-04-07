@@ -1,7 +1,5 @@
 package com.snapgames.platform;
 
-import com.snapgames.platform.demo.DemoScene;
-
 import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.swing.*;
@@ -1479,7 +1477,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     protected void loadScenes() {
-        scnManager.add(new DemoScene(this));
+
     }
 
     /**
