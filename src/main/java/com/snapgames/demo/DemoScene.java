@@ -39,6 +39,7 @@ public class DemoScene extends Platform2D.AbstractScene {
 
     @Override
     public void create(Platform2D app) {
+        Platform2D.Renderer renderer = app.getRenderer();
         // define the game World
         Platform2D.World world = new Platform2D.World(new Platform2D.Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
         app.setWorld(world);
@@ -65,7 +66,7 @@ public class DemoScene extends Platform2D.AbstractScene {
                 .addBehavior(new PlayerBehavior());
         add(player);
 
-        createHUD(app, player);
+        createHUD(app.getRenderer(), player);
 
         // Add some constraining object.
         Platform2D.ConstraintObject water = (Platform2D.ConstraintObject) new Platform2D.ConstraintObject("water",
@@ -109,15 +110,19 @@ public class DemoScene extends Platform2D.AbstractScene {
         setCamera(new Platform2D.Camera("cam01")
                 .setTarget(player)
                 .setTweenFactor(0.05)
-                .setViewport(new Rectangle2D.Double(0, 0, app.getBufferSize().getWidth(), app.getBufferSize().getHeight())));
+                .setViewport(
+                        new Rectangle2D.Double(0, 0,
+                                renderer.getBufferSize().getWidth(),
+                                renderer.getBufferSize().getHeight())))
+        ;
         // play sound when ready
         app.getSoundManager().playSound("toc");
 
     }
 
 
-    private void createHUD(Platform2D app, GameObject player) {
-        BufferedImage buffer = app.getDrawBuffer();
+    private void createHUD(Platform2D.Renderer renderer, GameObject player) {
+        BufferedImage buffer = renderer.getDrawBuffer();
         Platform2D.TextObject score = (Platform2D.TextObject) new Platform2D.TextObject("score")
                 .setFont(buffer.createGraphics().getFont().deriveFont(18.0f))
                 .setText("000000")
@@ -133,7 +138,7 @@ public class DemoScene extends Platform2D.AbstractScene {
         BufferedImage heartImage = ((BufferedImage) getResource("/assets/images/tiles01.png|0,96,16,16"));
         Platform2D.ImageObject heart = (Platform2D.ImageObject) new Platform2D.ImageObject("heart")
                 .setImage(heartImage)
-                .setPosition(app.getBufferSize().width - 32, 16)
+                .setPosition(renderer.getBufferSize().width - 32, 16)
                 .setPriority(1)
                 .setStaticObject(true)
                 .setStickToCamera(true);
@@ -142,7 +147,7 @@ public class DemoScene extends Platform2D.AbstractScene {
                 .setFont(buffer.createGraphics().getFont().deriveFont(12.0f))
                 .setText("" + (player.attributes.get("lives")))
                 .setShadowColor(new Color(0.2f, 0.2f, 0.2f, 0.8f))
-                .setPosition(app.getBufferSize().width - 24, 20)
+                .setPosition(renderer.getBufferSize().width - 24, 20)
                 .setFillColor(Color.WHITE)
                 .setBorderColor(Color.BLACK)
                 .setPriority(2)
@@ -182,7 +187,6 @@ public class DemoScene extends Platform2D.AbstractScene {
     }
 
     private void addEnemies(Platform2D.World w, GameObject player, int nbEnemies) {
-        Platform2D.Scene scn = app.getSceneManager().getActive();
 
         for (int i = 0; i < nbEnemies; i++) {
             // add a player object
