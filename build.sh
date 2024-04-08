@@ -27,11 +27,23 @@
 cd ./
 
 ENV=build
+# Step counter
+STEP=0
+# define colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
 # Reading of ${ENV}.properties file
 function prop {
   #grep "${1}" env/${ENV}.properties|cut -d'=' -f2
   grep "${1}" ${ENV}.properties | cut -d'=' -f2
+}
+
+function step() {
+  echo -e "|_" ${BLUE}$((STEP++)). ${1}${NC}
+  return
 }
 
 export PROGRAM_NAME=$(prop project.name)
@@ -84,11 +96,7 @@ if [[ "$OSTYPE" == "linux"* ]]; then
 else
   FS=";"
 fi
-# define colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+
 #
 # Paths
 export SRC=src
@@ -109,7 +117,7 @@ echo "> Java version : $JAVA_BUILD"
 echo "> Git   commit : $GIT_COMMIT_ID"
 echo "> Encoding     : $SOURCE_ENCODING"
 #
-echo -e "> ${BLUE}Prepare environment (if ~/.sdkmanrc' file exists)${NC}"
+step "Prepare environment (if ~/.sdkmanrc' file exists)"
 if [ -f .sdkmanrc ]; then
   echo " |_ file sdkmanrc detected"
   source "$HOME/.sdkman/bin/sdkman-init.sh"
@@ -125,7 +133,7 @@ function clearTarget() {
 #
 function manifest() {
   # build manifest
-  echo -e "|_ ${BLUE}1. Create Manifest file '${TARGET}/MANIFEST.MF'${NC}..."
+  echo -e "|_ ${BLUE}Create Manifest file '${TARGET}/MANIFEST.MF'${NC}..."
   echo """Manifest-Version: ${PROGRAM_NAME}
 Main-Class: ${MAIN_CLASS}
 Class-Path: ${EXTERNAL_JARS}
@@ -140,7 +148,7 @@ Implementation-Author: ${AUTHOR_NAME}
 }
 #
 function compile() {
-  echo -e "|_ ${BLUE}2. Compile sources from '$SRC/main'${NC}..."
+  step "Compile sources from '$SRC/main'..."
   echo "> from : ${SRC}"
   echo "> to   : ${CLASSES}"
   echo "> with : ${EXTERNAL_JARS}"
@@ -160,7 +168,7 @@ function compile() {
   echo "- Compile project from ${SRC} to ${CLASSES} with ${EXTERNAL_JARS}" >>target/build.log
 }
 function checkCodeStyleQA() {
-  echo -e "|_ ${BLUE}3. Check code quality against rules $CHECK_RULES${NC}..."
+  step "Check code quality against rules $CHECK_RULES$..."
   echo "> explore sources at : $SRC"
   mkdir -p $TARGET
   find $SRC/main -name '*.java' >$TARGET/sources.lst
@@ -175,7 +183,7 @@ function checkCodeStyleQA() {
   echo "- Check all code with  $CHECK_RULES" >>target/build.log
 }
 function generateJavadoc() {
-  echo -e "|_ ${BLUE}4. Generate Javadoc ${NC}..."
+  step "Generate Javadoc..."
   echo "> from : $SRC"
   echo "> to   : $TARGET/javadoc"
   # prepare target
@@ -201,7 +209,7 @@ function generateJavadoc() {
 }
 #
 function generateSourceJar() {
-  echo -e "|_ ${BLUE}5. Generate JAR sources $TARGET/${PROGRAM_NAME}-sources-${PROGRAM_VERSION}.jar${NC}..."
+  step"Generate JAR sources $TARGET/${PROGRAM_NAME}-sources-${PROGRAM_VERSION}.jar..."
   echo "> from : $SRC"
   echo "> to   : $TARGET/"
   jar cvf ${TARGET}/${PROGRAM_NAME}-${PROGRAM_VERSION}-sources.jar -C src .
@@ -210,7 +218,7 @@ function generateSourceJar() {
 }
 #
 function executeTests() {
-  echo -e "|_ ${BLUE}6. Execute tests${NC}..."
+  step "Execute tests..."
   echo "> from : $SRC/test"
   echo "> to   : $TARGET/test-classes"
   mkdir -p $TARGET/test-classes
@@ -221,9 +229,15 @@ function executeTests() {
   #list test sources
   find $SRC/main -name '*.java' >$TARGET/sources.lst
   find $SRC/test -name '*.java' >$TARGET/test-sources.lst
-  javac -source $SOURCE_VERSION -encoding $SOURCE_ENCODING $COMPILATION_OPTS -cp ".${FS}$LIB_TEST${FS}${EXTERNAL_JARS}" -d $TEST_CLASSES @$TARGET/sources.lst @$TARGET/test-sources.lst
+  javac -source $SOURCE_VERSION \
+  -encoding $SOURCE_ENCODING $COMPILATION_OPTS \
+  -cp ".${FS}$LIB_TEST${FS}${EXTERNAL_JARS}" \
+  -d $TEST_CLASSES @$TARGET/sources.lst \
+  @$TARGET/test-sources.lst
   echo "execute tests through JUnit"
-  java $JAR_OPTS -jar $LIB_TEST --cp "${EXTERNAL_JARS}${FS}${CLASSES}${FS}${TEST_CLASSES}${FS}." --scan-class-path
+  java $JAR_OPTS -jar $LIB_TEST \
+  --cp "${EXTERNAL_JARS}${FS}${CLASSES}${FS}${TEST_CLASSES}${FS}." \
+  --scan-class-path
   echo -e "   |_ ${GREEN}done$NC"
   echo "- execute tests through JUnit $SRC/test." >>target/build.log
 
@@ -232,7 +246,7 @@ function executeTests() {
 }
 #
 function createJar() {
-  echo -e "|_ ${BLUE}7. package jar file '$TARGET/$JAR_NAME'${NC}..."
+  step "Package jar file '$TARGET/$JAR_NAME'..."
   if ([ "$(ls $CLASSES | wc -l | grep -w "0")" ]); then
     echo '   |_ ${RED}ERROR: No compiled class files${NC}'
   else
@@ -245,7 +259,7 @@ function createJar() {
 #
 function wrapJar() {
   # create runnable program
-  echo -e "|_ ${BLUE}8. create run file '$BUILD/$PROGRAM_NAME-$PROGRAM_VERSION.run'${NC}..."
+  step "Create run file '$BUILD/$PROGRAM_NAME-$PROGRAM_VERSION.run'..."
   mkdir -p $BUILD/lib/dep
   cat $LIBS/stub.sh $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar >$BUILD/$PROGRAM_NAME-$PROGRAM_VERSION.run
   chmod +x $BUILD/$PROGRAM_NAME-$PROGRAM_VERSION.run
@@ -258,14 +272,15 @@ function executeJar() {
   manifest
   compile
   createJar
-  echo -e "|_ ${BLUE}9. Execute just created JAR $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar${NC}..."
+  step "Execute just created JAR $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar..."
+  # shellcheck disable=SC2145
   echo "$JAR_OPTS -cp \".${FS}${EXTERNAL_JARS}\" -jar $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar \"$@\""
   java $JAR_OPTS -cp ".${FS}$EXTERNAL_JARS" -jar $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar "$@"
   echo "- execute jar '$TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.jar'." >>target/build.log
 }
 #
 function generateEpub() {
-  echo -e "|_ ${BLUE}10.1 Generate documentation as E-PUB from '/docs' to '$TARGET/book/book-$PROGRAM_NAME-$PROGRAM_VERSION.epub'${NC}..."
+  step "Generate documentation as E-PUB from '/docs' to '$TARGET/book/book-$PROGRAM_NAME-$PROGRAM_VERSION.epub'..."
   if ! [ -x "$(command -v pandoc)" ]; then
     echo -e "   |_ ${RED}ERROR: pandoc not available.${NC}"
   else
@@ -282,7 +297,7 @@ function generateEpub() {
 }
 # TODO https://www.toptal.com/docker/pandoc-docker-publication-chain
 function generatePDF() {
-  echo -e "|_ ${BLUE}10.2 Generate documentation as PDF from '/docs' to '$TARGET/book/book-$PROGRAM_NAME-$PROGRAM_VERSION.pdf'${NC}..."
+  step "Generate documentation as PDF from '/docs' to '$TARGET/book/book-$PROGRAM_NAME-$PROGRAM_VERSION.pdf'..."
   if ! [ -x "$(command -v pandoc)" ]; then
     echo -e "   |_ ${RED}ERROR: pandoc not available.${NC}"
   else
@@ -304,7 +319,7 @@ function sign() {
 }
 #
 function createZIP() {
-  echo -e "|_ ${BLUE}11. Generate Zip distribution archive to $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.zip${NC}..."
+  step "Generate Zip distribution archive to $TARGET/$PROGRAM_NAME-$PROGRAM_VERSION.zip..."
   if ! [ -x "$(command -v zip)" ]; then
     echo -e "   |_ ${RED}ERROR: zip command not available.${NC}"
   else
@@ -398,7 +413,7 @@ function run() {
     ;;
   esac
   echo "-----------"
-  echo -e "... ${GREEN}done${NC}".
+  echo -e "|_ ${GREEN}done${NC}"
 }
 #
 run "$1"
