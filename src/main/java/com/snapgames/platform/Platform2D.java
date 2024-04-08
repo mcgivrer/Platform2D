@@ -1,7 +1,5 @@
 package com.snapgames.platform;
 
-import com.snapgames.platform.demo.DemoScene;
-
 import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.swing.*;
@@ -21,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 /**
@@ -220,7 +219,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         protected Node parent;
 
-        protected List<Node> children = new ArrayList<>();
+        protected List<Node> children = new CopyOnWriteArrayList<>();
 
         protected List<Behavior<? extends Node>> behaviors = new ArrayList<>();
 
@@ -551,17 +550,28 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     public static class ParticleSystem extends GameObject {
         int nbParticles = 0;
         int chunk = 10;
+        private Scene scene;
 
         public ParticleSystem(String name) {
             super(name);
         }
 
+
+        public ParticleSystem setScene(Scene s) {
+            this.scene = s;
+            return this;
+        }
+
         @Override
         public void update(double elapsed) {
-            if (nbParticles > children.size()) {
+            super.update(elapsed);
+            if (nbParticles > getChild().size()) {
                 for (int i = 0; i < chunk; i++) {
-                    behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b ->
-                            ((ParticleBehavior<? extends Node>) b).create((Scene) this.parent, this));
+                    behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b -> {
+                        add(
+                                ((ParticleBehavior<? extends Node>) b).create(scene, this)
+                        );
+                    });
                 }
             }
         }
@@ -570,6 +580,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.nbParticles = nbMaxParticles;
             this.children = new ArrayList<>();
             return this;
+        }
+
+        public int getMaxParticle() {
+            return nbParticles;
         }
     }
 
@@ -610,6 +624,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return constrains;
         }
 
+        public void setGravity(Vec2d newG) {
+            this.gravity = newG;
+        }
     }
 
     /**
@@ -745,10 +762,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
         public void add(GameObject gameObject) {
+            gameObject.parent = this;
             super.add(gameObject);
             objectMap.put(gameObject.getName(), gameObject);
             // update statistics data
-            getChild().sort((a, b) -> Integer.compare(((GameObject) a).priority, ((GameObject) b).priority));
+            getChild().sort(Comparator.comparingInt(a -> ((GameObject) a).priority));
         }
 
         public GameObject getObject(String name) {
@@ -997,9 +1015,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     public interface ParticleBehavior<T extends Node> extends Behavior<T> {
-        default GameObject create(Scene s, GameObject o) {
-            return null;
-        }
+        GameObject create(Scene s, GameObject o);
     }
 
     /**
@@ -1148,8 +1164,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             debug("%s|_ node:%s", "   ".repeat(level), node.getName());
             level += 1;
             for (Node n : node.getChild()) {
-                debug("%s|_ node:%s", "   ".repeat(level), n.getName());
-                if (!n.getChild().isEmpty()) {
+                debug("%s|_ node{%s}:%s", "   ".repeat(level), n.getClass().getSimpleName(), n.getName());
+                if (n.getChild().size() > 0) {
                     logDebugSceneTreeNode(n, level);
                 }
             }
@@ -1170,10 +1186,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
             config.put("app.test.mode", "false");
         }
-    }
-
-    protected void loadScenes() {
-        scnManager.add(new DemoScene(this));
     }
 
     /**
@@ -1463,7 +1475,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
                     o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
                     o.update(elapsed);
-                    keepGameObjectIntoPlayArea(world, o);
+                    keepGameObjectIntoPlayArea(scn.getWorld(), o);
                     o.forces.clear();
 
                 });
@@ -1585,9 +1597,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
                 .forEach(o -> {
                     drawGameObject(gb, scn, (GameObject) o);
+                    ((GameObject) o).getChild().forEach(c -> drawGameObject(gb, scn, c));
                     drawDebugInfo(gb, (GameObject) o);
                 });
     }
+
 
     /**
      * Draw the {@link GameObject} <code>o</code> from the scene <code>scn</code>
@@ -1602,9 +1616,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param scn the {@link Scene} parent of the {@link GameObject}.
      * @param o   the {@link GameObject} to be drawn.
      */
-    private void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
+    private void drawGameObject(Graphics2D gb, Scene scn, Node n) {
+        GameObject o = (GameObject) n;
         switch (o.getClass().getSimpleName()) {
-            case "GameObject" -> {
+            case "GameObject", "ParticleSystem" -> {
                 gb.setColor(o.fillColor);
                 gb.fill(o);
                 gb.setColor(o.borderColor);
