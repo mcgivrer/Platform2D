@@ -38,6 +38,8 @@ or, if you are a linux based guy, or a Windows constrained developer, but using 
 target/build/platform2d-1.0.0.run
 ```
 
+![Screen captuire from the 1.0.0 release](src/main/docs/illustrations/platform2d-1.0.0.png "Platform2D release 1.0.0")
+
 ## Contribute
 
 If you want to bring your own knowledge, you can fork this repository and create some pull request proposals to add new

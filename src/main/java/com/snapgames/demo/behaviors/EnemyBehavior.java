@@ -1,4 +1,4 @@
-package com.snapgames.platform.demo.behaviors;
+package com.snapgames.demo.behaviors;
 
 import com.snapgames.platform.Platform2D;
 
@@ -17,7 +17,7 @@ public class EnemyBehavior extends Platform2D.AbstractBehavior<Platform2D.GameOb
 
         double dist = pPos.distance(ePos);
         if (dist < 40.00) {
-            n.addForce(new Platform2D.Vec2d(pPos.x,pPos.y).multiply(-0.05));
+            n.addForce(new Platform2D.Vec2d(pPos.x, pPos.y).multiply(-0.05));
         }
     }
 

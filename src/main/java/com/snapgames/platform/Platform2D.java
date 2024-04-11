@@ -1,8 +1,7 @@
 package com.snapgames.platform;
 
-import com.snapgames.platform.demo.DemoScene;
-
 import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentEvent;
@@ -20,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 /**
@@ -67,16 +67,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static final double PHYSIC_TIME_FACTOR = 0.005;
     private static final Map<String, Object> resources = new LinkedHashMap<>(20, 0.80f);
-
-
-    /**
-     * the internal drawing image buffer
-     */
-    BufferedImage buffer;
-    /**
-     * the {@link JFrame} used as a window for out game.
-     */
-    JFrame frame;
 
     /**
      * Internal {@link Platform2D} instance name.
@@ -133,7 +123,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private boolean updateFlag = true;
     private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
+
+    private Renderer renderer;
     private SceneManager scnManager;
+    private SoundManager soundManager;
     private String defaultSceneName = "start";
     private String[] strSceneList = new String[]{"start:Platform2D"};
 
@@ -219,7 +212,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         protected Node parent;
 
-        protected List<Node> children = new ArrayList<>();
+        protected List<Node> children = new CopyOnWriteArrayList<>();
 
         protected List<Behavior<? extends Node>> behaviors = new ArrayList<>();
 
@@ -303,6 +296,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public <T extends Node> T addBehavior(Behavior<T> b) {
             behaviors.add(b);
             return (T) this;
+        }
+
+        public long getNextIndex() {
+            return index + 1;
         }
     }
 
@@ -427,13 +424,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return dbgInfo;
         }
 
-        protected Node setDebugOffsetY(int offY) {
+        protected GameObject setDebugOffsetY(int offY) {
             this.debugOffsetY = offY;
             return this;
         }
 
         public boolean isStaticObject() {
             return staticObject;
+        }
+
+        public GameObject setSize(int w, int h) {
+            setRect(x, y, w, h);
+            return this;
         }
     }
 
@@ -538,6 +540,46 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    public static class ParticleSystem extends GameObject {
+        int nbParticles = 0;
+        int chunk = 10;
+        private Scene scene;
+
+        public ParticleSystem(String name) {
+            super(name);
+        }
+
+
+        public ParticleSystem setScene(Scene s) {
+            this.scene = s;
+            return this;
+        }
+
+        @Override
+        public void update(double elapsed) {
+            super.update(elapsed);
+            if (nbParticles > getChild().size()) {
+                for (int i = 0; i < chunk; i++) {
+                    behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b -> {
+                        add(
+                            ((ParticleBehavior<? extends Node>) b).create(scene, this)
+                        );
+                    });
+                }
+            }
+        }
+
+        public ParticleSystem setMaxNbParticles(int nbMaxParticles) {
+            this.nbParticles = nbMaxParticles;
+            this.children = new ArrayList<>();
+            return this;
+        }
+
+        public int getMaxParticle() {
+            return nbParticles;
+        }
+    }
+
     /**
      * A {@link World} entity to host gravity and play area and the world containing objects.
      *
@@ -575,6 +617,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return constrains;
         }
 
+        public void setGravity(Vec2d newG) {
+            this.gravity = newG;
+        }
     }
 
     /**
@@ -613,14 +658,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                    * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                    * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                    this.viewport.getHeight());
+                this.viewport.getHeight());
 
         }
     }
@@ -636,6 +681,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         String getName();
 
         void initialize(Platform2D app);
+
+        default void load(Platform2D app) {
+        }
 
         void create(Platform2D app);
 
@@ -674,6 +722,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         List<Behavior<? extends Node>> getBehaviors();
 
         Platform2D getPlatform();
+
+        World getWorld();
     }
 
     /**
@@ -700,17 +750,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.app = app;
         }
 
-
         protected void setCamera(Platform2D.Camera cam) {
             this.camera = cam;
         }
 
-
         public void add(GameObject gameObject) {
+            gameObject.parent = this;
             super.add(gameObject);
             objectMap.put(gameObject.getName(), gameObject);
             // update statistics data
-            getChild().sort((a, b) -> Integer.compare(((GameObject) a).priority, ((GameObject) b).priority));
+            getChild().sort(Comparator.comparingInt(a -> ((GameObject) a).priority));
         }
 
         public GameObject getObject(String name) {
@@ -724,7 +773,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         public Platform2D.Camera getCamera() {
             return camera;
         }
-
 
         @Override
         public abstract String getName();
@@ -761,6 +809,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return app;
         }
 
+        @Override
+        public World getWorld() {
+            return app.world;
+        }
     }
 
     /**
@@ -782,12 +834,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         @Override
         public void create(Platform2D app) {
-            Graphics2D gb = app.getDrawBuffer().createGraphics();
+            Renderer renderer = app.getRenderer();
+            Graphics2D gb = renderer.getDrawBuffer().createGraphics();
 
             // add background Image
             BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
             ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
-                    .setImage(bckImage).setPriority(0);
+                .setImage(bckImage).setPriority(0);
             add(backgroundIObj);
 
             // add welcome message
@@ -796,13 +849,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             gb.setFont(welcomeFont);
             int textWidth = gb.getFontMetrics().stringWidth(welcomeTxt);
             TextObject txtObject = (TextObject) new TextObject("welcome")
-                    .setText(welcomeTxt)
-                    .setShadowColor(Color.BLACK)
-                    .setFont(welcomeFont)
-                    .setPosition((app.getBufferSize().width - textWidth) * 0.5, app.getBufferSize().height * 0.5)
-                    .setBorderColor(Color.WHITE)
-                    .setPriority(1)
-                    .setStaticObject(true);
+                .setText(welcomeTxt)
+                .setShadowColor(Color.BLACK)
+                .setFont(welcomeFont)
+                .setPosition(
+                    (renderer.getBufferSize().width - textWidth) * 0.5,
+                    renderer.getBufferSize().height * 0.5)
+                .setBorderColor(Color.WHITE)
+                .setPriority(1)
+                .setStaticObject(true);
             add(txtObject);
         }
 
@@ -955,6 +1010,407 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    public interface ParticleBehavior<T extends Node> extends Behavior<T> {
+        GameObject create(Scene s, GameObject o);
+    }
+
+    /**
+     * The `SoundManager` will help play sound and music as WAV file.
+     * <ul>
+     *     <li>Add sound from file with {@link SoundManager#loadSound(String, String)},</li>
+     *     <li>Play sound with {@link SoundManager#playSound(String)},</li>
+     *     <li>Stop a sound with {@link SoundManager#stopSound(String)},</li>
+     *     <li>Stop All soiund with {@link SoundManager#stopAllSounds()}.</li>
+     * </ul>
+     */
+    public static class SoundManager {
+        private Platform2D app;
+        private Map<String, Clip> soundClips = new HashMap<>();
+
+        public SoundManager(Platform2D app) {
+            this.app = app;
+
+        }
+
+        public void loadSound(String name, String filePath) {
+            try {
+                AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(Objects.requireNonNull(SoundManager.class.getResourceAsStream(filePath)));
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioInputStream);
+                soundClips.put(name, clip);
+            } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) {
+                error("Unable to load sound %s from file %s: %s", name, filePath, e.getMessage());
+            }
+        }
+
+        public void playSound(String name) {
+            Clip clip = soundClips.get(name);
+            if (clip != null) {
+                if (!clip.isRunning())
+                    clip.setFramePosition(0);
+                clip.start();
+            }
+        }
+
+        public void stopSound(String name) {
+            Clip clip = soundClips.get(name);
+            if (clip != null && clip.isRunning()) {
+                clip.stop();
+                clip.setFramePosition(0);
+            }
+        }
+
+        public void stopAllSounds() {
+            for (Clip clip : soundClips.values()) {
+                if (clip.isRunning()) {
+                    clip.stop();
+                    clip.setFramePosition(0);
+                }
+            }
+        }
+    }
+
+    public interface RenderPlugin<T extends GameObject> {
+        void draw(Graphics2D g, Scene scn, Node go);
+
+        Class<T> getObjectClass();
+    }
+
+
+    /**
+     * Renderer service to draw all scene objects.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.0
+     */
+    public static class Renderer {
+
+        public Map<Class<? extends GameObject>, RenderPlugin<? extends GameObject>> plugins = new HashMap<>();
+        private Platform2D app;
+
+        /**
+         * the internal drawing image buffer
+         */
+        BufferedImage buffer;
+        /**
+         * the {@link JFrame} used as a window for out game.
+         */
+        JFrame frame;
+        /**
+         * configured screen buffer size
+         */
+        private Dimension bufferSize;
+        /**
+         * Configured game Window size.
+         */
+        private Dimension screenSize;
+
+        public Renderer(Platform2D app) {
+            this.app = app;
+            addPlugin(new GameObjectRenderPlugin());
+            addPlugin(new TextObjectRenderPlugin());
+            addPlugin(new ImageObjectRenderPlugin());
+            addPlugin(new ConstraintObjectRenderPlugin());
+            addPlugin(new ParticleSystemRenderPlugin());
+        }
+
+        public void addPlugin(RenderPlugin<? extends GameObject> renderPlugin) {
+            plugins.put(renderPlugin.getObjectClass(), renderPlugin);
+        }
+
+        public void initialize(Dimension bufferSize, Dimension screenSize) {
+            this.bufferSize = bufferSize;
+            this.screenSize = screenSize;
+
+            // create internal drawing buffer
+            buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
+
+            // create window
+            frame = new JFrame(getMessage("app.title"));
+
+            frame.setContentPane(app);
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.addComponentListener(app);
+            frame.addKeyListener(app);
+            frame.pack();
+            if (!app.testMode) {
+                frame.setVisible(true);
+            }
+            frame.createBufferStrategy(3);
+        }
+
+        public void draw(Scene s, Map<String, Object> stats) {
+            Camera camera = s.getCamera();
+            Graphics2D gb = buffer.createGraphics();
+            // set Antialiasing mode
+            gb.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            gb.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            // clear buffer
+            gb.setBackground(Color.BLACK);
+            gb.clearRect(0, 0, 640, 400);
+
+            if (Optional.ofNullable(camera).isPresent()) {
+                gb.translate(-camera.x, -camera.y);
+            }
+            drawAllEntity(gb, s, false);
+
+            if (Optional.ofNullable(s.getWorld()).isPresent() && debug > 1) {
+                gb.setColor(Color.YELLOW);
+                gb.draw(s.getWorld().getPlayArea());
+            }
+
+            if (Optional.ofNullable(camera).isPresent()) {
+                gb.translate(camera.x, camera.y);
+            }
+            drawAllEntity(gb, s, true);
+            s.draw(app, gb, stats);
+
+            gb.dispose();
+
+            // draw to screen.
+            displayToWindow(stats);
+        }
+
+        private void draw(Map<String, Object> stats) {
+
+        }
+
+        /**
+         * Draw all entities
+         *
+         * @param gb            the Graphics API
+         * @param scn           Scene to be drawn.
+         * @param stickToCamera define if entities must be moved with the {@link Camera} offset.
+         */
+        private void drawAllEntity(Graphics2D gb, Scene scn, boolean stickToCamera) {
+            // draw all the platform game's scene.
+
+            scn.getChild().stream()
+                .filter(Node::isActive)
+                .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
+                .forEach(o -> {
+                    GameObject go = (GameObject) o;
+                    drawGameObject(gb, scn, go);
+                    drawDebugInfo(gb, go);
+                    go.getChild().forEach(c -> {
+                        drawGameObject(gb, scn, (GameObject) c);
+                        drawDebugInfo(gb, (GameObject) c);
+                    });
+
+
+                });
+        }
+
+        /**
+         * Draw the {@link GameObject} <code>o</code> from the scene <code>scn</code>
+         * using the {@link Graphics2D} API <code>gb</code>.
+         *
+         * <p>The drawing method depends on the real nature  of the object (its class).</p>
+         *
+         * <blockquote><em><strong>TODO</strong> A possible evolution consists in replacing the specific internal implementation with an
+         * extensible plugin pattern. See <a href="https://github.com/mcgivrer/Platform2D/issues/4">issue #4</a>.</em></blockquote>
+         *
+         * @param gb  the Graphics API
+         * @param scn the {@link Scene} parent of the {@link GameObject}.
+         * @param o   the {@link GameObject} to be drawn.
+         */
+        private <T extends GameObject> void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
+            if (plugins.containsKey(o.getClass())) {
+                plugins.get(o.getClass()).draw(gb, scn, o);
+            }
+
+            o.getBehaviors().forEach(b -> b.input(scn, o));
+        }
+
+        /**
+         * Copy rendering buffer to game window and show visual stats on screen bottom.
+         *
+         * @param stats a Map of statistics and KPI to be displayed in debug mode (debug>0).
+         */
+        private void displayToWindow(Map<String, Object> stats) {
+            Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
+            g.drawImage(buffer,
+                0, 0, screenSize.width, screenSize.height,
+                0, 0, bufferSize.width, bufferSize.height,
+                null);
+            g.setColor(Color.ORANGE);
+            if (debug > 0) {
+                g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
+                    16, frame.getHeight() - 16);
+            }
+            g.dispose();
+            frame.getBufferStrategy().show();
+        }
+
+        /**
+         * Draw visual debug information relative to a specific {@link GameObject} instance.
+         *
+         * @param gb the {@link Graphics2D} API instance to be used.
+         * @param o  the {@link GameObject} to display visual debug information for.
+         */
+        private void drawDebugInfo(Graphics2D gb, GameObject o) {
+            if (Optional.ofNullable(app.debugFilter).isPresent()
+                && (app.debugFilter.contains(o.name) || app.debugFilter.equals("all"))) {
+                if (debug > 0) {
+                    gb.setColor(Color.ORANGE);
+                    gb.setFont(gb.getFont().deriveFont(9.0f));
+                    int line = 0;
+                    for (String item : o.toDebugString()) {
+                        int level = Integer.parseInt(item.contains("_") ? item.substring(0, item.indexOf("_")) : "0");
+                        if (debug > level) {
+                            String info = item.substring(item.indexOf("_") + 1);
+                            gb.drawString(info, (int) (o.x + o.width + 4), (int) (o.y + o.debugOffsetY + (line++ * 9)));
+                        }
+                    }
+                    if (debug > 1) {
+                        // draw bounding box
+                        gb.setColor(Color.ORANGE);
+                        gb.draw(o);
+                        if (!o.staticObject) {
+                            // show all applied forces
+                            for (Vec2d f : o.forces) {
+                                gb.setColor(Color.WHITE);
+                                gb.drawLine(
+                                    (int) (o.x + (o.width * 0.5)),
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                            }
+                            // draw velocity
+                            gb.setColor(Color.GREEN);
+                            gb.drawLine(
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                            // draw Acceleration
+                            gb.setColor(Color.BLUE);
+                            gb.drawLine((int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                        }
+                    }
+                }
+
+            }
+        }
+
+
+        public BufferedImage getDrawBuffer() {
+            return buffer;
+        }
+
+        public Dimension getBufferSize() {
+            return bufferSize;
+        }
+
+        public void dispose() {
+            frame.dispose();
+        }
+
+        public JFrame getFrame() {
+            return frame;
+        }
+    }
+
+
+    public static class GameObjectRenderPlugin implements RenderPlugin<GameObject> {
+
+        @Override
+        public void draw(Graphics2D gb, Scene scn, Node o) {
+            GameObject go = (GameObject) o;
+            gb.setColor(go.fillColor);
+            gb.fill(go);
+            gb.setColor(go.borderColor);
+            gb.draw(go);
+        }
+
+        @Override
+        public Class<GameObject> getObjectClass() {
+            return GameObject.class;
+        }
+    }
+
+    public static class TextObjectRenderPlugin implements RenderPlugin<TextObject> {
+        @Override
+        public void draw(Graphics2D gb, Scene scn, Node o) {
+            TextObject to = (TextObject) o;
+            int offFontY = gb.getFontMetrics(to.font).getAscent();
+            if (to.text != null) {
+                gb.setFont(to.font);
+                to.draw(gb);
+                for (int ix = -1; ix < 1; ix++) {
+                    for (int iy = -1; iy < 1; iy++) {
+                        gb.setColor(to.borderColor);
+                        gb.drawString(to.text, (int) to.x + ix, (int) to.y + iy + offFontY);
+                    }
+                }
+                gb.setColor(to.shadowColor);
+                gb.drawString(to.text, (int) to.x + 2, (int) to.y + 2 + offFontY);
+                gb.setColor(to.fillColor);
+                gb.drawString(to.text, (int) to.x, (int) to.y + offFontY);
+            }
+        }
+
+        @Override
+        public Class<TextObject> getObjectClass() {
+            return TextObject.class;
+        }
+    }
+
+    public static class ImageObjectRenderPlugin implements RenderPlugin<ImageObject> {
+
+        @Override
+        public void draw(Graphics2D gb, Scene scn, Node o) {
+            ImageObject io = (ImageObject) o;
+            if (Optional.ofNullable(scn).isPresent()) {
+                io.width = Math.min(scn.getWorld().playArea.getWidth() - io.x, io.getImage().getWidth());
+                io.height = Math.min(scn.getWorld().playArea.getHeight() - io.y, io.getImage().getHeight());
+            }
+            gb.drawImage(io.getImage(), (int) io.x, (int) io.y, (int) io.width, (int) io.height, null);
+        }
+
+        @Override
+        public Class<ImageObject> getObjectClass() {
+            return ImageObject.class;
+        }
+    }
+
+    public static class ConstraintObjectRenderPlugin implements RenderPlugin<ConstraintObject> {
+        @Override
+        public void draw(Graphics2D gb, Scene scn, Node o) {
+            ConstraintObject co = (ConstraintObject) o;
+            if (Optional.ofNullable(co.fillColor).isPresent()) {
+                gb.setColor(co.fillColor);
+                gb.fill(co);
+            }
+        }
+
+        @Override
+        public Class<ConstraintObject> getObjectClass() {
+            return ConstraintObject.class;
+        }
+    }
+
+    public static class ParticleSystemRenderPlugin implements RenderPlugin<ParticleSystem> {
+
+        @Override
+        public void draw(Graphics2D gb, Scene scn, Node o) {
+            ParticleSystem go = (ParticleSystem) o;
+            gb.setColor(go.fillColor);
+            gb.fill(go);
+            gb.setColor(go.borderColor);
+            gb.draw(go);
+        }
+
+        @Override
+        public Class<ParticleSystem> getObjectClass() {
+            return ParticleSystem.class;
+        }
+    }
+
     /**
      * The translated messages to be displayed in log or on screen.
      */
@@ -1003,21 +1459,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         setMinimumSize(screenSize);
 
         // create internal drawing buffer
-        buffer = new BufferedImage(bufferSize.width, bufferSize.height, BufferedImage.TYPE_INT_ARGB);
+        renderer = new Renderer(this);
+        renderer.initialize(bufferSize, screenSize);
 
-        // create window
-        frame = new JFrame(getMessage("app.title"));
-
-        frame.setContentPane(this);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.addComponentListener(this);
-        frame.addKeyListener(this);
-        frame.pack();
-        if (!testMode) {
-            frame.setVisible(true);
-        }
-        frame.createBufferStrategy(3);
-
+        // initialize Sound Management
+        soundManager = new SoundManager(this);
 
         // prepare Scenes
         scnManager = new SceneManager(this);
@@ -1026,28 +1472,30 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             Scene start = new StartScene(this);
             setWorld(new World());
             scnManager.add(start);
-
         }
-        // activate the default scene
-
+        // Activate the default scene
         scnManager.activate(defaultSceneName);
         logDebugSceneTreeNode((Node) scnManager.getActive(), 0);
     }
 
+    /**
+     * trace content of the Scene tree structure.
+     *
+     * @param node  the Starting point of the tree parsing
+     * @param level the depth of parsing.
+     */
     private void logDebugSceneTreeNode(Node node, int level) {
-
         if (node != null) {
             debug("%s|_ node:%s", "   ".repeat(level), node.getName());
             level += 1;
             for (Node n : node.getChild()) {
-                debug("%s|_ node:%s", "   ".repeat(level), n.getName());
+                debug("%s|_ node{%s}:%s", "   ".repeat(level), n.getClass().getSimpleName(), n.getName());
                 if (n.getChild().size() > 0) {
                     logDebugSceneTreeNode(n, level);
                 }
             }
         }
     }
-
 
     public static String getMessage(String key) {
         return messages.getString(key);
@@ -1063,11 +1511,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
             config.put("app.test.mode", "false");
         }
-
-    }
-
-    protected void loadScenes() {
-        scnManager.add(new DemoScene(this));
     }
 
     /**
@@ -1092,9 +1535,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(String[] args) {
         Map<String, Object> attributes = Arrays.stream(args)
-                .map(s -> s.split("="))
-                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
-
+            .map(s -> s.split("="))
+            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
         parseAttributes(attributes);
     }
 
@@ -1105,7 +1547,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(Properties props) {
         Map<String, Object> attributes = props.entrySet().stream()
-                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
         parseAttributes(attributes);
     }
 
@@ -1116,11 +1558,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param attributes the map of (key,value) to feed the configuration.
      */
     private void parseAttributes(Map<String, Object> attributes) {
-        if (attributes.size() > 0) {
+        if (!attributes.isEmpty()) {
             for (Map.Entry<String, Object> entry : attributes.entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
-// Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
+                // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
                 switch (key) {
                     case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
                     case "app.screen.size", "buffer", "b" -> {
@@ -1186,23 +1628,33 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return resources.get(path);
     }
 
+    /**
+     * Load and slice image according to the path and the following parameters (pattern [\x,y,width,height]).
+     *
+     * @param path the path to the resource with optional attribute.
+     *             For image, it can be the slicing operation at [\x,y,width,height].
+     */
     private static void loadAndOrSliceImageFrom(String path) {
-        try {
-            if (path.contains("|")) {
-                //required to extract path or the image file.
-                String parts[] = path.substring(path.lastIndexOf("|") + 1).split(",");
-                int px = Integer.parseInt(parts[0]);
-                int py = Integer.parseInt(parts[1]);
-                int pw = Integer.parseInt(parts[2]);
-                int ph = Integer.parseInt(parts[3]);
-                String realPath = path.substring(0, path.lastIndexOf("|"));
-                BufferedImage img = ImageIO.read(Platform2D.class.getResourceAsStream(realPath));
-                resources.put(path, img.getSubimage(px, py, pw, ph));
-            } else {
-                resources.put(path, ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(path))));
+        if (Optional.ofNullable(path).isPresent()) {
+            try {
+                if (path.contains("|")) {
+                    //required to extract path or the image file.
+                    String[] parts = path.substring(path.lastIndexOf("|") + 1).split(",");
+                    int px = Integer.parseInt(parts[0]);
+                    int py = Integer.parseInt(parts[1]);
+                    int pw = Integer.parseInt(parts[2]);
+                    int ph = Integer.parseInt(parts[3]);
+                    String realPath = path.substring(0, path.lastIndexOf("|"));
+                    BufferedImage img = ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(realPath)));
+                    resources.put(path, img.getSubimage(px, py, pw, ph));
+                } else {
+                    resources.put(path, ImageIO.read(Objects.requireNonNull(Platform2D.class.getResourceAsStream(path))));
+                }
+            } catch (IOException e) {
+                error("Unable to read Image resource: %s", e.getMessage());
             }
-        } catch (IOException e) {
-            error("Unable to read Image resource " + e.getMessage());
+        } else {
+            error("resource path is null !");
         }
     }
 
@@ -1213,6 +1665,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         dispose();
     }
 
+    /**
+     * The main game loop.
+     */
     private void loop() {
         long frames = 0, framesPerSec = 0;
         long updates = 0, updatesPerSec = 0;
@@ -1237,6 +1692,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 cumulatedTime = 0;
                 frames = 0;
                 updates = 0;
+            }
+            if (cumulatedTime % 333 == 0) {
                 updateStats(stats, framesPerSec, updatesPerSec, gameTime, elapsed);
             }
             if (drawFlag) {
@@ -1265,17 +1722,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-            Map<String, Object> stats,
-            long framesPerSec,
-            long updatesPerSec,
-            long gameTime,
-            double elapsed) {
+        Map<String, Object> stats,
+        long framesPerSec,
+        long updatesPerSec,
+        long gameTime,
+        double elapsed) {
         Scene scn = getSceneManager().getActiveScene();
         List<GameObject> objects = (List<GameObject>) scn.getChild();
         long countActive = objects.stream()
-                .filter(Node::isActive).count();
+            .filter(Node::isActive).count();
         long countStatic = objects.stream()
-                .filter(GameObject::isObjectStatic).count();
+            .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -1287,6 +1744,11 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * Retrieve the current {@link SceneManager} instance.
+     *
+     * @return the current {@link SceneManager} instance.
+     */
     public SceneManager getSceneManager() {
         return scnManager;
     }
@@ -1307,41 +1769,41 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Scene scn = getSceneManager().getActiveScene();
 
         scn.getChild().stream()
-                // process only active and non-static objects
-                .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
-                .forEach(n -> {
-                    GameObject o = (GameObject) n;
-                    // reset current GameObject acceleration
-                    o.ax = 0;
-                    o.ay = 0;
+            // process only active and non-static objects
+            .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
+            .forEach(n -> {
+                GameObject o = (GameObject) n;
+                // reset current GameObject acceleration
+                o.ax = 0;
+                o.ay = 0;
 
-                    // apply all concerned World constraints
-                    applyWorldConstraints(world, o, elapsed);
+                // apply all concerned World constraints
+                applyWorldConstraints(world, o, elapsed);
 
-                    // add applied forces on acceleration
-                    o.forces.forEach(v -> {
-                        o.ax += v.x;
-                        o.ay += v.y;
-                    });
-
-                    // compute resulting speed
-                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                    // get the GameObject o position
-                    o.x += o.dx * elapsed;
-                    o.y += o.dy * elapsed;
-
-                    // apply friction "force" to the velocity
-                    o.dx *= o.material.friction;
-                    o.dy *= o.material.friction;
-
-                    o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
-                    o.update(elapsed);
-                    keepGameObjectIntoPlayArea(world, o);
-                    o.forces.clear();
-
+                // add applied forces on acceleration
+                o.forces.forEach(v -> {
+                    o.ax += v.x;
+                    o.ay += v.y;
                 });
+
+                // compute resulting speed
+                o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+                o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+                // get the GameObject o position
+                o.x += o.dx * elapsed;
+                o.y += o.dy * elapsed;
+
+                // apply friction "force" to the velocity
+                o.dx *= o.material.friction;
+                o.dy *= o.material.friction;
+
+                o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
+                o.update(elapsed);
+                keepGameObjectIntoPlayArea(scn.getWorld(), o);
+                o.forces.clear();
+
+            });
 
         if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
             Camera camera = scnManager.getActiveScene().getCamera();
@@ -1413,232 +1875,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param stats the internal statistics and KPI to be displayed on screen (only if debug>0)
      */
     private void draw(Map<String, Object> stats) {
-        Camera camera = scnManager.getActiveScene().getCamera();
-        Graphics2D gb = buffer.createGraphics();
-        // set Antialiasing mode
-        gb.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        gb.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
-        // clear buffer
-        gb.setBackground(Color.BLACK);
-        gb.clearRect(0, 0, 640, 400);
-
-        if (Optional.ofNullable(camera).isPresent()) {
-            gb.translate(-camera.x, -camera.y);
-        }
-        drawAllEntity(gb, false);
-
-        if (Optional.ofNullable(world).isPresent() && debug > 1) {
-            gb.setColor(Color.YELLOW);
-            gb.draw(world.getPlayArea());
-        }
-
-        if (Optional.ofNullable(camera).isPresent()) {
-            gb.translate(camera.x, camera.y);
-        }
-        drawAllEntity(gb, true);
-        scnManager.draw(gb, stats);
-
-        gb.dispose();
-
-        // draw to screen.
-        displayToWindow(stats);
-    }
-
-    private void drawAllEntity(Graphics2D gb, boolean stickToCamera) {
-        // draw all the platform game's scene.
-        Scene scn = getSceneManager().getActiveScene();
-
-        scn.getChild().stream()
-                .filter(Node::isActive)
-                .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
-                .forEach(o -> {
-                    drawGameObject(gb, scn, (GameObject) o);
-                    drawDebugInfo(gb, (GameObject) o);
-                });
-    }
-
-    private void drawGameObject(Graphics2D gb, Scene scn, GameObject o) {
-        switch (o.getClass().getSimpleName()) {
-            case "GameObject" -> {
-                gb.setColor(o.fillColor);
-                gb.fill(o);
-                gb.setColor(o.borderColor);
-                gb.draw(o);
-            }
-            case "ImageObject" -> {
-                ImageObject io = (ImageObject) o;
-                double w = Math.min(world.playArea.getWidth() - io.x, io.getImage().getWidth());
-                double h = Math.min(world.playArea.getHeight() - io.y, io.getImage().getHeight());
-                gb.drawImage(io.getImage(), (int) io.x, (int) io.y, (int) w, (int) h, null);
-            }
-            case "ConstraintObject" -> {
-                gb.setColor(o.fillColor);
-                gb.fill(o);
-            }
-            case "TextObject" -> {
-                TextObject to = (TextObject) o;
-                int offFontY = gb.getFontMetrics(to.font).getAscent();
-                if (to.text != null) {
-                    gb.setFont(to.font);
-                    to.draw(gb);
-                    for (int ix = -1; ix < 1; ix++) {
-                        for (int iy = -1; iy < 1; iy++) {
-                            gb.setColor(to.borderColor);
-                            gb.drawString(to.text, (int) to.x + ix, (int) to.y + iy + offFontY);
-                        }
-                    }
-                    gb.setColor(to.shadowColor);
-                    gb.drawString(to.text, (int) to.x + 2, (int) to.y + 2 + offFontY);
-                    gb.setColor(to.fillColor);
-                    gb.drawString(to.text, (int) to.x, (int) to.y + offFontY);
-                }
-            }
-            default -> {
-                error("No rendering process defined for %s", o.getClass().getSimpleName());
-            }
-
-        }
-
-        o.getBehaviors().forEach(b -> b.input(scn, o));
-    }
-
-    /**
-     * Copy rendering buffer to game window and show visual stats on screen bottom.
-     *
-     * @param stats a Map of statistics and KPI to be displayed in debug mode (debug>0).
-     */
-    private void displayToWindow(Map<String, Object> stats) {
-        Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
-        g.drawImage(buffer,
-                0, 0, screenSize.width, screenSize.height,
-                0, 0, bufferSize.width, bufferSize.height,
-                null);
-        g.setColor(Color.ORANGE);
-        g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-                16, frame.getHeight() - 16);
-        g.dispose();
-        frame.getBufferStrategy().show();
-    }
-
-    /**
-     * Create a String from all the {@link java.util.Map.Entry} of a {@link Map}.
-     * <p>
-     * the String is composed on the format "[ entry1:value1 | entry2:value2 ]"
-     * where, in e the map :
-     *
-     * <pre>
-     * Maps.of("1_entry1","value1","2_entry2","value2",...);
-     * </pre>
-     *
-     * <p>
-     * This will sort the Entry on the `[9]` from the `[9]_[keyname]` key name.
-     *
-     * @param attributes the {@link Map} of value to be displayed.
-     * @param start      the character to start the string with.
-     * @param end        the character to end the string with.
-     * @param delimiter  the character to seperate each entry.
-     * @return a concatenated {@link String} based on the {@link Map}
-     * {@link java.util.Map.Entry}.
-     */
-    public static String prepareStatsString(Map<String, Object> attributes, String start, String end,
-                                            String delimiter) {
-        return start + attributes.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(entry -> {
-            String value = "";
-            switch (entry.getValue().getClass().getSimpleName()) {
-                case "Double", "double", "Float", "float" -> {
-                    value = String.format("%04.2f", entry.getValue());
-                }
-                case "Integer", "int" -> {
-                    value = String.format("%5d", entry.getValue());
-                }
-                default -> {
-                    value = entry.getValue().toString();
-                }
-            }
-            return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                    + ":"
-                    + value;
-        }).collect(Collectors.joining(delimiter)) + end;
-    }
-
-    /**
-     * Convert a long duration value to a formatted String value "D hh:mm:ss.SSS".
-     *
-     * @param milliseconds in ms
-     * @return formatted String "%d d - %02d:%02d:%02d.%03d"
-     */
-    public static String formatDuration(long milliseconds, boolean withMS) {
-        Duration duration = Duration.ofMillis(milliseconds);
-        if (duration.toDays() > 0) {
-            return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
-                    duration.toDays(),
-                    duration.toHours() - (24 * duration.toDays()),
-                    duration.toMinutesPart(),
-                    duration.toSecondsPart(),
-                    duration.toMillisPart());
-        } else {
-            return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
-                    duration.toHours(),
-                    duration.toMinutesPart(),
-                    duration.toSecondsPart(),
-                    duration.toMillisPart());
-
-        }
-    }
-
-    /**
-     * Draw visual debug information relative to a specific {@link GameObject} instance.
-     *
-     * @param gb the {@link Graphics2D} API instance to be used.
-     * @param o  the {@link GameObject} to display visual debug information for.
-     */
-    private void drawDebugInfo(Graphics2D gb, GameObject o) {
-        if (Optional.ofNullable(debugFilter).isPresent()
-                && (debugFilter.contains(o.name) || debugFilter.equals("all"))) {
-            if (debug > 0) {
-                gb.setColor(Color.ORANGE);
-                gb.setFont(gb.getFont().deriveFont(9.0f));
-                int line = 0;
-                for (String item : o.toDebugString()) {
-                    int level = Integer.parseInt(item.contains("_") ? item.substring(0, item.indexOf("_")) : "0");
-                    if (debug > level) {
-                        String info = item.substring(item.indexOf("_") + 1);
-                        gb.drawString(info, (int) (o.x + o.width + 4), (int) (o.y + o.debugOffsetY + (line++ * 9)));
-                    }
-                }
-                if (debug > 1) {
-                    // draw bounding box
-                    gb.setColor(Color.ORANGE);
-                    gb.draw(o);
-                    if (!o.staticObject) {
-                        // show all applied forces
-                        for (Vec2d f : o.forces) {
-                            gb.setColor(Color.WHITE);
-                            gb.drawLine(
-                                    (int) (o.x + (o.width * 0.5)),
-                                    (int) (o.y + (o.height * 0.5)),
-                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
-                        }
-                        // draw velocity
-                        gb.setColor(Color.GREEN);
-                        gb.drawLine(
-                                (int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
-                        // draw Acceleration
-                        gb.setColor(Color.BLUE);
-                        gb.drawLine((int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
-                    }
-                }
-            }
-
-        }
+        renderer.draw(scnManager.getActiveScene(), stats);
     }
 
     /**
@@ -1648,8 +1885,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         if (Optional.ofNullable(scnManager).isPresent()) {
             scnManager.disposeAll();
         }
-        if (Optional.ofNullable(frame).isPresent()) {
-            frame.dispose();
+        if (Optional.ofNullable(renderer).isPresent()) {
+            renderer.dispose();
         }
     }
 
@@ -1758,12 +1995,84 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         this.world = world;
     }
 
-    public Dimension getBufferSize() {
-        return bufferSize;
+    public Renderer getRenderer() {
+        return renderer;
     }
 
-    public BufferedImage getDrawBuffer() {
-        return buffer;
+    /**
+     * Return te current instance of the {@link SoundManager}
+     *
+     * @return the instance of {@link SoundManager}
+     */
+    public SoundManager getSoundManager() {
+        return soundManager;
+    }
+
+
+    /**
+     * Create a String from all the {@link java.util.Map.Entry} of a {@link Map}.
+     * <p>
+     * the String is composed on the format "[ entry1:value1 | entry2:value2 ]"
+     * where, in e the map :
+     *
+     * <pre>
+     * Maps.of("1_entry1","value1","2_entry2","value2",...);
+     * </pre>
+     *
+     * <p>
+     * This will sort the Entry on the `[9]` from the `[9]_[keyname]` key name.
+     *
+     * @param attributes the {@link Map} of value to be displayed.
+     * @param start      the character to start the string with.
+     * @param end        the character to end the string with.
+     * @param delimiter  the character to seperate each entry.
+     * @return a concatenated {@link String} based on the {@link Map}
+     * {@link java.util.Map.Entry}.
+     */
+    public static String prepareStatsString(Map<String, Object> attributes, String start, String end,
+                                            String delimiter) {
+        return start + attributes.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(entry -> {
+            String value = "";
+            switch (entry.getValue().getClass().getSimpleName()) {
+                case "Double", "double", "Float", "float" -> {
+                    value = String.format("%04.2f", entry.getValue());
+                }
+                case "Integer", "int" -> {
+                    value = String.format("%5d", entry.getValue());
+                }
+                default -> {
+                    value = entry.getValue().toString();
+                }
+            }
+            return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
+                + ":"
+                + value;
+        }).collect(Collectors.joining(delimiter)) + end;
+    }
+
+    /**
+     * Convert a long duration value to a formatted String value "D hh:mm:ss.SSS".
+     *
+     * @param milliseconds in ms
+     * @return formatted String "%d d - %02d:%02d:%02d.%03d"
+     */
+    public static String formatDuration(long milliseconds, boolean withMS) {
+        Duration duration = Duration.ofMillis(milliseconds);
+        if (duration.toDays() > 0) {
+            return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
+                duration.toDays(),
+                duration.toHours() - (24 * duration.toDays()),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
+        } else {
+            return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
+                duration.toHours(),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
+
+        }
     }
 
     /**
@@ -1771,9 +2080,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-                "Platform2D",
-                new Dimension(320, 200),
-                new Dimension(640, 400));
+            "Platform2D",
+            new Dimension(320, 200),
+            new Dimension(640, 400));
         platform2d.run(args);
     }
 }

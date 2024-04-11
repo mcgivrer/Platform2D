@@ -1,4 +1,4 @@
-package com.snapgames.platform.demo.behaviors;
+package com.snapgames.demo.behaviors;
 
 import com.snapgames.platform.Platform2D;
 import com.snapgames.platform.Platform2D.GameObject;
@@ -32,5 +32,10 @@ public class PlayerBehavior extends Platform2D.AbstractBehavior<GameObject> {
         if (app.isKeyPressed(KeyEvent.VK_X)) {
 
         }
+    }
+
+    @Override
+    public void update(Scene s, double elapsed, GameObject n) {
+
     }
 }
