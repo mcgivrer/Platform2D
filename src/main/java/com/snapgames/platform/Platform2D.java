@@ -433,8 +433,18 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             return staticObject;
         }
 
-        public GameObject setSize(int w, int h) {
+        public GameObject setSize(double w, double h) {
             setRect(x, y, w, h);
+            return this;
+        }
+
+        public int getPriority() {
+            return priority;
+        }
+
+        public GameObject setSize(Rectangle2D playArea) {
+            this.width = playArea.getWidth();
+            this.height = playArea.getHeight();
             return this;
         }
     }
@@ -1011,7 +1021,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     public interface ParticleBehavior<T extends Node> extends Behavior<T> {
-        GameObject create(Scene s, GameObject o);
+        GameObject create(Scene s, GameObject parent);
     }
 
     /**
@@ -1189,6 +1199,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             scn.getChild().stream()
                 .filter(Node::isActive)
                 .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
+                .sorted(Comparator.comparingInt((Node o) -> ((GameObject) o).getPriority()))
                 .forEach(o -> {
                     GameObject go = (GameObject) o;
                     drawGameObject(gb, scn, go);
@@ -1230,6 +1241,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
          */
         private void displayToWindow(Map<String, Object> stats) {
             Graphics2D g = (Graphics2D) frame.getBufferStrategy().getDrawGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.drawImage(buffer,
                 0, 0, screenSize.width, screenSize.height,
                 0, 0, bufferSize.width, bufferSize.height,
@@ -1323,8 +1336,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             GameObject go = (GameObject) o;
             gb.setColor(go.fillColor);
             gb.fill(go);
-            gb.setColor(go.borderColor);
-            gb.draw(go);
+            if (go.borderColor != null) {
+                gb.setColor(go.borderColor);
+                gb.draw(go);
+            }
         }
 
         @Override
@@ -1365,9 +1380,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         @Override
         public void draw(Graphics2D gb, Scene scn, Node o) {
             ImageObject io = (ImageObject) o;
-            if (Optional.ofNullable(scn).isPresent()) {
-                io.width = Math.min(scn.getWorld().playArea.getWidth() - io.x, io.getImage().getWidth());
-                io.height = Math.min(scn.getWorld().playArea.getHeight() - io.y, io.getImage().getHeight());
+            World world = scn.getWorld();
+            if (Optional.ofNullable(world).isPresent()) {
+                io.width = Math.min(world.playArea.getWidth() - io.x, io.getImage().getWidth());
+                io.height = Math.min(world.playArea.getHeight() - io.y, io.getImage().getHeight());
             }
             gb.drawImage(io.getImage(), (int) io.x, (int) io.y, (int) io.width, (int) io.height, null);
         }
@@ -1401,8 +1417,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             ParticleSystem go = (ParticleSystem) o;
             gb.setColor(go.fillColor);
             gb.fill(go);
-            gb.setColor(go.borderColor);
-            gb.draw(go);
         }
 
         @Override
@@ -1822,27 +1836,29 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void keepGameObjectIntoPlayArea(World world, GameObject go) {
         // Constrains the GameObject o into the play area.
-        Rectangle2D playArea = world.getPlayArea();
-        if (playArea.intersects(go) || !playArea.contains(go)) {
-            if (go.x < 0) {
-                go.x = 0;
-                go.dx *= -go.material.elasticity;
-                go.contact = true;
-            }
-            if (go.x > playArea.getWidth() - go.width) {
-                go.x = playArea.getWidth() - go.width;
-                go.dx *= -go.material.elasticity;
-                go.contact = true;
-            }
-            if (go.y < 0) {
-                go.y = 0;
-                go.dy *= -go.material.elasticity;
-                go.contact = true;
-            }
-            if (go.y > playArea.getHeight() - go.width) {
-                go.y = playArea.getHeight() - go.height;
-                go.dy *= -go.material.elasticity;
-                go.contact = true;
+        if (world != null) {
+            Rectangle2D playArea = world.getPlayArea();
+            if (playArea.intersects(go) || !playArea.contains(go)) {
+                if (go.x < 0) {
+                    go.x = 0;
+                    go.dx *= -go.material.elasticity;
+                    go.contact = true;
+                }
+                if (go.x > playArea.getWidth() - go.width) {
+                    go.x = playArea.getWidth() - go.width;
+                    go.dx *= -go.material.elasticity;
+                    go.contact = true;
+                }
+                if (go.y < 0) {
+                    go.y = 0;
+                    go.dy *= -go.material.elasticity;
+                    go.contact = true;
+                }
+                if (go.y > playArea.getHeight() - go.width) {
+                    go.y = playArea.getHeight() - go.height;
+                    go.dy *= -go.material.elasticity;
+                    go.contact = true;
+                }
             }
         }
     }
@@ -1856,14 +1872,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void applyWorldConstraints(World world, GameObject go, double elapsed) {
         // apply gravity
-        go.forces.add(world.getGravity());
-        // if o is under some world constrain
-        for (GameObject c : world.constrains) {
-            if (c.contains(go) || go.intersects(c)) {
-                for (Vec2d v : c.forces) {
-                    Rectangle2D penetration = c.createIntersection(go);
-                    go.ax += v.x * (penetration.getWidth() / (go.width * go.mass)) * elapsed;
-                    go.ay += v.y * ((penetration.getWidth() * 0.75) / (go.width * go.mass)) * elapsed;
+        if (world != null) {
+            go.forces.add(world.getGravity());
+            // if o is under some world constrain
+            for (GameObject c : world.constrains) {
+                if (c.contains(go) || go.intersects(c)) {
+                    for (Vec2d v : c.forces) {
+                        Rectangle2D penetration = c.createIntersection(go);
+                        go.ax += v.x * (penetration.getWidth() / (go.width * go.mass)) * elapsed;
+                        go.ay += v.y * ((penetration.getWidth() * 0.75) / (go.width * go.mass)) * elapsed;
+                    }
                 }
             }
         }
