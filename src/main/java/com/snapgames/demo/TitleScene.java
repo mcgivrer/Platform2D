@@ -1,4 +1,4 @@
-package com.snapgames.platform.demo;
+package com.snapgames.demo;
 
 import com.snapgames.platform.Platform2D;
 
@@ -21,7 +21,7 @@ public class TitleScene extends Platform2D.AbstractScene {
     @Override
 
     public void create(Platform2D app) {
-        Graphics2D gb = app.getDrawBuffer().createGraphics();
+        Graphics2D gb = app.getRenderer().getDrawBuffer().createGraphics();
 
         // add background Image
         BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
@@ -38,7 +38,7 @@ public class TitleScene extends Platform2D.AbstractScene {
             .setText(welcomeTxt)
             .setShadowColor(Color.BLACK)
             .setFont(welcomeFont)
-            .setPosition((app.getBufferSize().width - textWidth) * 0.5, app.getBufferSize().height * 0.5)
+            .setPosition((app.getRenderer().getBufferSize().width - textWidth) * 0.5, app.getRenderer().getBufferSize().height * 0.5)
             .setBorderColor(Color.WHITE)
             .setPriority(1)
             .setStaticObject(true);
