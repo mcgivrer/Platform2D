@@ -178,7 +178,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static class Material {
 
-        public static Material DEFAULT = new Material("default", 1.0, 0.70, 0.98);
+        public static final Material DEFAULT = new Material("default", 1.0, 0.70, 0.98);
+        public static final Material WATER = new Material("water", 0.8, 0.70, 0.92);
+        public static final Material WOOD = new Material("wood", 1.2, 0.70, 0.90);
 
         public String name;
         public double density;
@@ -572,7 +574,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 for (int i = 0; i < chunk; i++) {
                     behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b -> {
                         add(
-                            ((ParticleBehavior<? extends Node>) b).create(scene, this)
+                                ((ParticleBehavior<? extends Node>) b).create(scene, this)
                         );
                     });
                 }
@@ -668,14 +670,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                            * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                    * tweenFactor * Math.min(dt, 10));
+                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                            * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                this.viewport.getHeight());
+                    this.viewport.getHeight());
 
         }
     }
@@ -850,7 +852,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             // add background Image
             BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
             ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
-                .setImage(bckImage).setPriority(0);
+                    .setImage(bckImage).setPriority(0);
             add(backgroundIObj);
 
             // add welcome message
@@ -859,15 +861,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             gb.setFont(welcomeFont);
             int textWidth = gb.getFontMetrics().stringWidth(welcomeTxt);
             TextObject txtObject = (TextObject) new TextObject("welcome")
-                .setText(welcomeTxt)
-                .setShadowColor(Color.BLACK)
-                .setFont(welcomeFont)
-                .setPosition(
-                    (renderer.getBufferSize().width - textWidth) * 0.5,
-                    renderer.getBufferSize().height * 0.5)
-                .setBorderColor(Color.WHITE)
-                .setPriority(1)
-                .setStaticObject(true);
+                    .setText(welcomeTxt)
+                    .setShadowColor(Color.BLACK)
+                    .setFont(welcomeFont)
+                    .setPosition(
+                            (renderer.getBufferSize().width - textWidth) * 0.5,
+                            renderer.getBufferSize().height * 0.5)
+                    .setBorderColor(Color.WHITE)
+                    .setPriority(1)
+                    .setStaticObject(true);
             add(txtObject);
         }
 
@@ -1020,6 +1022,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     }
 
+    /**
+     * ParticleBehavior is
+     * @param <T>
+     */
     public interface ParticleBehavior<T extends Node> extends Behavior<T> {
         GameObject create(Scene s, GameObject parent);
     }
@@ -1080,18 +1086,22 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * {@link RenderPlugin} interface to implement specific
+     *
+     * @param <T>
+     */
     public interface RenderPlugin<T extends GameObject> {
         void draw(Graphics2D g, Scene scn, Node go);
 
         Class<T> getObjectClass();
     }
 
-
     /**
      * Renderer service to draw all scene objects.
      *
      * @author Frederic Delorme
-     * @since 1.0.0
+     * @since 1.0.1
      */
     public static class Renderer {
 
@@ -1197,20 +1207,20 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             // draw all the platform game's scene.
 
             scn.getChild().stream()
-                .filter(Node::isActive)
-                .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
-                .sorted(Comparator.comparingInt((Node o) -> ((GameObject) o).getPriority()))
-                .forEach(o -> {
-                    GameObject go = (GameObject) o;
-                    drawGameObject(gb, scn, go);
-                    drawDebugInfo(gb, go);
-                    go.getChild().forEach(c -> {
-                        drawGameObject(gb, scn, (GameObject) c);
-                        drawDebugInfo(gb, (GameObject) c);
+                    .filter(Node::isActive)
+                    .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
+                    .sorted(Comparator.comparingInt((Node o) -> ((GameObject) o).getPriority()))
+                    .forEach(o -> {
+                        GameObject go = (GameObject) o;
+                        drawGameObject(gb, scn, go);
+                        drawDebugInfo(gb, go);
+                        go.getChild().forEach(c -> {
+                            drawGameObject(gb, scn, (GameObject) c);
+                            drawDebugInfo(gb, (GameObject) c);
+                        });
+
+
                     });
-
-
-                });
         }
 
         /**
@@ -1244,13 +1254,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.drawImage(buffer,
-                0, 0, screenSize.width, screenSize.height,
-                0, 0, bufferSize.width, bufferSize.height,
-                null);
+                    0, 0, screenSize.width, screenSize.height,
+                    0, 0, bufferSize.width, bufferSize.height,
+                    null);
             g.setColor(Color.ORANGE);
             if (debug > 0) {
                 g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-                    16, frame.getHeight() - 16);
+                        16, frame.getHeight() - 16);
             }
             g.dispose();
             frame.getBufferStrategy().show();
@@ -1264,7 +1274,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
          */
         private void drawDebugInfo(Graphics2D gb, GameObject o) {
             if (Optional.ofNullable(app.debugFilter).isPresent()
-                && (app.debugFilter.contains(o.name) || app.debugFilter.equals("all"))) {
+                    && (app.debugFilter.contains(o.name) || app.debugFilter.equals("all"))) {
                 if (debug > 0) {
                     gb.setColor(Color.ORANGE);
                     gb.setFont(gb.getFont().deriveFont(9.0f));
@@ -1285,24 +1295,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                             for (Vec2d f : o.forces) {
                                 gb.setColor(Color.WHITE);
                                 gb.drawLine(
-                                    (int) (o.x + (o.width * 0.5)),
-                                    (int) (o.y + (o.height * 0.5)),
-                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                        (int) (o.x + (o.width * 0.5)),
+                                        (int) (o.y + (o.height * 0.5)),
+                                        (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                        (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                             }
                             // draw velocity
                             gb.setColor(Color.GREEN);
                             gb.drawLine(
-                                (int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                                    (int) (o.x + (o.width * 0.5)),
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                             // draw Acceleration
                             gb.setColor(Color.BLUE);
                             gb.drawLine((int) (o.x + (o.width * 0.5)),
-                                (int) (o.y + (o.height * 0.5)),
-                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                         }
                     }
                 }
@@ -1328,7 +1338,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
-
+    /**
+     * The GameObject rendering plugin implementation.
+     *
+     * @author Frederic Delorme
+     * @since 1.1
+     */
     public static class GameObjectRenderPlugin implements RenderPlugin<GameObject> {
 
         @Override
@@ -1348,6 +1363,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The TextObject rendering plugin implementation.
+     *
+     * @author Frederic Delorme
+     * @since 1.1
+     */
     public static class TextObjectRenderPlugin implements RenderPlugin<TextObject> {
         @Override
         public void draw(Graphics2D gb, Scene scn, Node o) {
@@ -1375,6 +1396,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The ImageObject rendering plugin implementation
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class ImageObjectRenderPlugin implements RenderPlugin<ImageObject> {
 
         @Override
@@ -1394,6 +1421,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The ConstraintObject rendering plugin implementation
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class ConstraintObjectRenderPlugin implements RenderPlugin<ConstraintObject> {
         @Override
         public void draw(Graphics2D gb, Scene scn, Node o) {
@@ -1410,6 +1443,12 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
     }
 
+    /**
+     * The P>articleSystem rendering plugin implementation
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
     public static class ParticleSystemRenderPlugin implements RenderPlugin<ParticleSystem> {
 
         @Override
@@ -1549,8 +1588,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(String[] args) {
         Map<String, Object> attributes = Arrays.stream(args)
-            .map(s -> s.split("="))
-            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+                .map(s -> s.split("="))
+                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
         parseAttributes(attributes);
     }
 
@@ -1561,7 +1600,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void parseArguments(Properties props) {
         Map<String, Object> attributes = props.entrySet().stream()
-            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
         parseAttributes(attributes);
     }
 
@@ -1736,17 +1775,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-        Map<String, Object> stats,
-        long framesPerSec,
-        long updatesPerSec,
-        long gameTime,
-        double elapsed) {
+            Map<String, Object> stats,
+            long framesPerSec,
+            long updatesPerSec,
+            long gameTime,
+            double elapsed) {
         Scene scn = getSceneManager().getActiveScene();
         List<GameObject> objects = (List<GameObject>) scn.getChild();
         long countActive = objects.stream()
-            .filter(Node::isActive).count();
+                .filter(Node::isActive).count();
         long countStatic = objects.stream()
-            .filter(GameObject::isObjectStatic).count();
+                .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -1780,44 +1819,45 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed
      */
     void update(double elapsed) {
+
         Scene scn = getSceneManager().getActiveScene();
 
         scn.getChild().stream()
-            // process only active and non-static objects
-            .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
-            .forEach(n -> {
-                GameObject o = (GameObject) n;
-                // reset current GameObject acceleration
-                o.ax = 0;
-                o.ay = 0;
+                // process only active and non-static objects
+                .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
+                .forEach(n -> {
+                    GameObject o = (GameObject) n;
+                    // reset current GameObject acceleration
+                    o.ax = 0;
+                    o.ay = 0;
 
-                // apply all concerned World constraints
-                applyWorldConstraints(world, o, elapsed);
+                    // apply all concerned World constraints
+                    applyWorldConstraints(world, o, elapsed);
 
-                // add applied forces on acceleration
-                o.forces.forEach(v -> {
-                    o.ax += v.x;
-                    o.ay += v.y;
+                    // add applied forces on acceleration
+                    o.forces.forEach(v -> {
+                        o.ax += v.x * elapsed * PHYSIC_TIME_FACTOR;
+                        o.ay += v.y * elapsed * PHYSIC_TIME_FACTOR;
+                    });
+
+                    // compute resulting speed
+                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+                    // get the GameObject o position
+                    o.x += o.dx * elapsed;
+                    o.y += o.dy * elapsed;
+
+                    // apply friction "force" to the velocity
+                    o.dx *= o.material.friction;
+                    o.dy *= o.material.friction;
+
+                    o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
+                    o.update(elapsed);
+                    keepGameObjectIntoPlayArea(scn.getWorld(), o);
+                    o.forces.clear();
+
                 });
-
-                // compute resulting speed
-                o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                // get the GameObject o position
-                o.x += o.dx * elapsed;
-                o.y += o.dy * elapsed;
-
-                // apply friction "force" to the velocity
-                o.dx *= o.material.friction;
-                o.dy *= o.material.friction;
-
-                o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
-                o.update(elapsed);
-                keepGameObjectIntoPlayArea(scn.getWorld(), o);
-                o.forces.clear();
-
-            });
 
         if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
             Camera camera = scnManager.getActiveScene().getCamera();
@@ -1872,16 +1912,27 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private void applyWorldConstraints(World world, GameObject go, double elapsed) {
         // apply gravity
-        if (world != null) {
+        if (Optional.ofNullable(world).isPresent()) {
+            // apply world gravity
             go.forces.add(world.getGravity());
-            // if o is under some world constrain
+
+            // if GameObject is under some world constrain
             for (GameObject c : world.constrains) {
                 if (c.contains(go) || go.intersects(c)) {
+
+                    // if forces exist, apply it to the GameObject.
                     for (Vec2d v : c.forces) {
                         Rectangle2D penetration = c.createIntersection(go);
                         go.ax += v.x * (penetration.getWidth() / (go.width * go.mass)) * elapsed;
                         go.ay += v.y * ((penetration.getWidth() * 0.75) / (go.width * go.mass)) * elapsed;
                     }
+
+                    // Apply friction to the velocity of the GameObject.
+                    if (Optional.ofNullable(c.material).isPresent()) {
+                        go.dx *= c.material.friction;
+                        go.dy *= c.material.friction;
+                    }
+
                 }
             }
         }
@@ -2063,8 +2114,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                + ":"
-                + value;
+                    + ":"
+                    + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
@@ -2078,17 +2129,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Duration duration = Duration.ofMillis(milliseconds);
         if (duration.toDays() > 0) {
             return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
-                duration.toDays(),
-                duration.toHours() - (24 * duration.toDays()),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toDays(),
+                    duration.toHours() - (24 * duration.toDays()),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
         } else {
             return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
-                duration.toHours(),
-                duration.toMinutesPart(),
-                duration.toSecondsPart(),
-                duration.toMillisPart());
+                    duration.toHours(),
+                    duration.toMinutesPart(),
+                    duration.toSecondsPart(),
+                    duration.toMillisPart());
 
         }
     }
@@ -2098,9 +2149,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-            "Platform2D",
-            new Dimension(320, 200),
-            new Dimension(640, 400));
+                "Platform2D",
+                new Dimension(320, 200),
+                new Dimension(640, 400));
         platform2d.run(args);
     }
 }

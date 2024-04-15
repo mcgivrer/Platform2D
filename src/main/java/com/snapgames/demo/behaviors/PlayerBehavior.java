@@ -15,7 +15,7 @@ public class PlayerBehavior extends Platform2D.AbstractBehavior<GameObject> {
         Platform2D app = s.getPlatform();
         GameObject player = (GameObject) n;
 
-        double speed = (double) player.attributes.getOrDefault("speed", 0.5);
+        double speed = (double) player.attributes.getOrDefault("speed", 5.0);
         if (app.isKeyPressed(KeyEvent.VK_UP)) {
             player.forces.add(new Platform2D.Vec2d(0, -speed));
         }
