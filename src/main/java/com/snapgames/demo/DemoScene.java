@@ -11,6 +11,7 @@ import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
+import static com.snapgames.platform.Platform2D.error;
 import static com.snapgames.platform.Platform2D.getResource;
 
 public class DemoScene extends Platform2D.AbstractScene {
@@ -29,24 +30,32 @@ public class DemoScene extends Platform2D.AbstractScene {
     }
 
     @Override
+    public void load(Platform2D app) {
+        app.getSoundManager().loadSound("clic", "/assets/audio/clic.wav");
+        app.getSoundManager().loadSound("tic", "/assets/audio/tic.wav");
+        app.getSoundManager().loadSound("toc", "/assets/audio/toc.wav");
+    }
+
+
+    @Override
     public void create(Platform2D app) {
         Platform2D.Renderer renderer = app.getRenderer();
         // define the game World
         Platform2D.World world = new Platform2D.World(new Platform2D.Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
         app.setWorld(world);
 
-        BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
-
+        /*BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
         Platform2D.ImageObject background = (Platform2D.ImageObject) new Platform2D.ImageObject("background")
-                .setImage(backgroundImg)
-                .setStaticObject(true)
-                .setPriority(-10);
+            .setImage(backgroundImg)
+            .setStaticObject(true)
+            .setPriority(-10);
         add(background);
+        */
 
         // add a player object
         GameObject player = new GameObject(
                 "player",
-                renderer.getBufferSize().width >> 1, renderer.getBufferSize().height >> 1,
+                world.getPlayArea().getWidth() * 0.5, world.getPlayArea().getHeight() * 0.5,
                 16, 16)
                 .setMaterial(new Platform2D.Material("player", 1.0, 0.30, 0.92))
                 .addAttribute("energy", 100)
@@ -73,29 +82,41 @@ public class DemoScene extends Platform2D.AbstractScene {
 
         world.addConstrain(water);
 
-        ParticleSystem ps = new ParticleSystem("ps01").setMaxNbParticles(200).addBehavior(new Platform2D.ParticleBehavior<ParticleSystem>() {
-            @Override
-            public GameObject create(Platform2D.Scene s, GameObject o) {
-                Rectangle2D pa = s.getWorld().getPlayArea();
-                GameObject particle = new GameObject(o.getName() + "-" + o.getNextIndex())
-                        .setPosition(
-                                pa.getWidth() * Math.random(),
-                                pa.getHeight() * Math.random())
-                        .setSize(1, 1)
-                        .setBorderColor(Color.WHITE)
-                        .setStaticObject(true);
 
-                return particle;
-            }
-        });
+        ParticleSystem ps = new ParticleSystem("ps01")
+                .setMaxNbParticles(200)
+                .setScene(this)
+                .addBehavior(new Platform2D.ParticleBehavior<ParticleSystem>() {
+                    @Override
+                    public GameObject create(Platform2D.Scene s, GameObject o) {
+                        Rectangle2D pa = s.getWorld().getPlayArea();
+
+                        return new GameObject(o.getName() + "-" + o.getNextIndex())
+                                .setPosition(
+                                        pa.getWidth() * Math.random(),
+                                        pa.getHeight() * Math.random())
+                                .setSize(1, 1)
+                                .setBorderColor(Color.WHITE)
+                                .setFillColor(Color.WHITE)
+                                .setStaticObject(true);
+                    }
+                });
+        add(ps);
+
 
         // add some enemies
-        addEnemies(app, player, 10);
+        addEnemies(world, player, 10);
 
         setCamera(new Platform2D.Camera("cam01")
                 .setTarget(player)
                 .setTweenFactor(0.05)
-                .setViewport(new Rectangle2D.Double(0, 0, renderer.getBufferSize().getWidth(), renderer.getBufferSize().getHeight())));
+                .setViewport(
+                        new Rectangle2D.Double(0, 0,
+                                renderer.getBufferSize().getWidth(),
+                                renderer.getBufferSize().getHeight())))
+        ;
+        // play sound when ready
+        app.getSoundManager().playSound("toc");
 
     }
 
@@ -151,20 +172,27 @@ public class DemoScene extends Platform2D.AbstractScene {
                 if (e.isShiftDown()) {
                     nbEnemeisToAdd *= 10;
                 }
+                GameObject player = getObject("player");
+                addEnemies(getWorld(), player, nbEnemeisToAdd);
             }
+            case KeyEvent.VK_G -> {
+                // reverse Gravity
+                getWorld().setGravity(getWorld().getGravity().multiply(-1));
+            }
+            default -> {
+                error("No specific action at Scene level for key %s", e.getKeyChar());
+            }
+
         }
     }
 
-    private void addEnemies(Platform2D app, GameObject go, int nbEnemies) {
-        Platform2D.Renderer renderer = app.getRenderer();
-        Platform2D.Scene scn = app.getSceneManager().getActive();
-        GameObject player = scn.getObject("player");
+    private void addEnemies(Platform2D.World w, GameObject player, int nbEnemies) {
 
         for (int i = 0; i < nbEnemies; i++) {
             // add a player object
             GameObject enemy = new GameObject(
                     "enemy_" + i,
-                    Math.random() * renderer.getBufferSize().width, Math.random() * renderer.getBufferSize().height,
+                    Math.random() * w.getPlayArea().getWidth(), Math.random() * w.getPlayArea().getHeight(),
                     8, 8)
                     .setMaterial(new Platform2D.Material("enemy", 0.7, 0.80, 0.99))
                     .setFillColor(Color.BLUE)

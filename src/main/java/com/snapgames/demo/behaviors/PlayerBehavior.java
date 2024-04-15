@@ -33,4 +33,9 @@ public class PlayerBehavior extends Platform2D.AbstractBehavior<GameObject> {
 
         }
     }
+
+    @Override
+    public void update(Scene s, double elapsed, GameObject n) {
+
+    }
 }
