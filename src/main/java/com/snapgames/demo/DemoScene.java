@@ -5,6 +5,7 @@ import com.snapgames.demo.behaviors.PlayerBehavior;
 import com.snapgames.platform.Platform2D;
 import com.snapgames.platform.Platform2D.GameObject;
 import com.snapgames.platform.Platform2D.ParticleSystem;
+import com.snapgames.platform.Platform2D.Vec2d;
 
 import java.awt.*;
 import java.awt.event.KeyEvent;
@@ -41,7 +42,9 @@ public class DemoScene extends Platform2D.AbstractScene {
     public void create(Platform2D app) {
         Platform2D.Renderer renderer = app.getRenderer();
         // define the game World
-        Platform2D.World world = new Platform2D.World(new Platform2D.Vec2d(0, 0.0981), new Rectangle2D.Double(0, 0, 320, 200));
+        Platform2D.World world = new Platform2D.World(
+                new Vec2d(0, 0.981),
+                new Rectangle2D.Double(0, 0, 320, 200));
         app.setWorld(world);
 
         /*BufferedImage backgroundImg = ((BufferedImage) getResource("/assets/images/backgrounds/forest.jpg"));
@@ -61,7 +64,7 @@ public class DemoScene extends Platform2D.AbstractScene {
                 .addAttribute("energy", 100)
                 .addAttribute("mana", 100)
                 .addAttribute("lives", 3)
-                .addAttribute("speed", 0.3)
+                .addAttribute("speed", 5.0)
                 .setMass(80.0)
                 .addBehavior(new PlayerBehavior());
         add(player);
@@ -69,7 +72,8 @@ public class DemoScene extends Platform2D.AbstractScene {
         createHUD(app.getRenderer(), player);
 
         // Add some constraining object.
-        Platform2D.ConstraintObject water = (Platform2D.ConstraintObject) new Platform2D.ConstraintObject("water",
+        Platform2D.ConstraintObject water = (Platform2D.ConstraintObject) new Platform2D.ConstraintObject(
+                "water",
                 0,
                 world.getPlayArea().getHeight() * 0.70,
                 world.getPlayArea().getWidth(),
@@ -77,7 +81,8 @@ public class DemoScene extends Platform2D.AbstractScene {
                 .setPriority(2)
                 .setFillColor(new Color(0.2f, 0.2f, 0.7f, 0.4f))
                 .setBorderColor(new Color(0.0f, 0.0f, 0.0f, 0.0f))
-                .addForce(new Platform2D.Vec2d(0, -0.3));
+                .setMaterial(Platform2D.Material.WATER)
+                .addForce(new Vec2d(0, -0.3));
         add(water);
 
         world.addConstrain(water);
@@ -85,19 +90,21 @@ public class DemoScene extends Platform2D.AbstractScene {
 
         ParticleSystem ps = new ParticleSystem("ps01")
                 .setMaxNbParticles(200)
-                .setScene(this)
+                .setSize(getWorld().getPlayArea())
+                .setFillColor(Color.BLACK)
+                .setBorderColor(null)
+                .setPriority(-10)
                 .addBehavior(new Platform2D.ParticleBehavior<ParticleSystem>() {
                     @Override
-                    public GameObject create(Platform2D.Scene s, GameObject o) {
-                        Rectangle2D pa = s.getWorld().getPlayArea();
-
-                        return new GameObject(o.getName() + "-" + o.getNextIndex())
+                    public GameObject create(Platform2D.Scene s, GameObject parent) {
+                        Color starColor = darkerColor(Color.WHITE, (int) (Math.random() * 15), 15);
+                        return new GameObject(parent.getName() + "-" + parent.getNextIndex())
                                 .setPosition(
-                                        pa.getWidth() * Math.random(),
-                                        pa.getHeight() * Math.random())
-                                .setSize(1, 1)
-                                .setBorderColor(Color.WHITE)
-                                .setFillColor(Color.WHITE)
+                                        parent.width * Math.random(),
+                                        parent.height * Math.random())
+                                .setSize(0.5, 0.5)
+                                .setBorderColor(starColor)
+                                .setFillColor(starColor)
                                 .setStaticObject(true);
                     }
                 });
@@ -120,6 +127,16 @@ public class DemoScene extends Platform2D.AbstractScene {
 
     }
 
+
+    private Color darkerColor(Color fillColor, float intesity, float max) {
+        float[] colors = new float[4];
+        colors = fillColor.getRGBComponents(colors);
+
+        return new Color(
+                (colors[0] * (intesity / max)),
+                (colors[1] * (intesity / max)),
+                (colors[2] * (intesity / max)));
+    }
 
     private void createHUD(Platform2D.Renderer renderer, GameObject player) {
         BufferedImage buffer = renderer.getDrawBuffer();
@@ -177,10 +194,10 @@ public class DemoScene extends Platform2D.AbstractScene {
             }
             case KeyEvent.VK_G -> {
                 // reverse Gravity
-                getWorld().setGravity(getWorld().getGravity().multiply(-1));
+                Vec2d g = getWorld().getGravity();
+                getWorld().setGravity(g.multiply(-1));
             }
             default -> {
-                error("No specific action at Scene level for key %s", e.getKeyChar());
             }
 
         }
