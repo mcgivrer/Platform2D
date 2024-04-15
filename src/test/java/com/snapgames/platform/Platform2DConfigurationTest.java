@@ -22,10 +22,10 @@ class Platform2DConfigurationTest {
     @Test
     public void defaultConfigTest() {
         app.initialize(new String[]{"cf=/no-config-test.properties", "app.test.mode=true"});
-        Assertions.assertEquals(320, app.buffer.getWidth());
-        Assertions.assertEquals(200, app.buffer.getHeight());
-        Assertions.assertEquals(640, app.frame.getContentPane().getWidth());
-        Assertions.assertEquals(400, app.frame.getContentPane().getHeight());
+        Assertions.assertEquals(320, app.getRenderer().getBufferSize().getWidth());
+        Assertions.assertEquals(200, app.getRenderer().getBufferSize().getHeight());
+        Assertions.assertEquals(640, app.getRenderer().getFrame().getContentPane().getWidth());
+        Assertions.assertEquals(400, app.getRenderer().getFrame().getContentPane().getHeight());
     }
 
 
@@ -33,36 +33,36 @@ class Platform2DConfigurationTest {
     public void loadSpecifiedConfigurationFileTest() {
         app.initialize(new String[]{"cf=/debug-config-test.properties", "app.test.mode=true"});
 
-        Assertions.assertEquals(2, app.debug);
+        Assertions.assertEquals(2, Platform2D.debug);
         Assertions.assertEquals("player,score", app.debugFilter);
-        Assertions.assertEquals(320, app.buffer.getWidth());
-        Assertions.assertEquals(200, app.buffer.getHeight());
-        Assertions.assertEquals(640, app.frame.getContentPane().getWidth());
-        Assertions.assertEquals(400, app.frame.getContentPane().getHeight());
+        Assertions.assertEquals(320, app.getRenderer().getBufferSize().getWidth());
+        Assertions.assertEquals(200, app.getRenderer().getBufferSize().getHeight());
+        Assertions.assertEquals(640, app.getRenderer().getFrame().getContentPane().getWidth());
+        Assertions.assertEquals(400, app.getRenderer().getFrame().getContentPane().getHeight());
     }
 
     @Test
     public void loadConfigurationFileTest() {
         app.initialize(new String[]{"cf=/debug-config-test.properties", "app.test.mode=true"});
 
-        Assertions.assertEquals(2, app.debug);
+        Assertions.assertEquals(2, Platform2D.debug);
         Assertions.assertEquals("player,score", app.debugFilter);
-        Assertions.assertEquals(320, app.buffer.getWidth());
-        Assertions.assertEquals(200, app.buffer.getHeight());
-        Assertions.assertEquals(640, app.frame.getContentPane().getWidth());
-        Assertions.assertEquals(400, app.frame.getContentPane().getHeight());
+        Assertions.assertEquals(320, app.getRenderer().getBufferSize().getWidth());
+        Assertions.assertEquals(200, app.getRenderer().getBufferSize().getHeight());
+        Assertions.assertEquals(640, app.getRenderer().getFrame().getContentPane().getWidth());
+        Assertions.assertEquals(400, app.getRenderer().getFrame().getContentPane().getHeight());
     }
 
     @Test
     public void loadDefaultConfigurationFileTest() {
         app.initialize(new String[]{"app.test.mode=true"});
 
-        Assertions.assertEquals(0, app.debug);
+        Assertions.assertEquals(0, Platform2D.debug);
         Assertions.assertEquals("", app.debugFilter);
-        Assertions.assertEquals(320, app.buffer.getWidth());
-        Assertions.assertEquals(200, app.buffer.getHeight());
-        Assertions.assertEquals(640, app.frame.getContentPane().getWidth());
-        Assertions.assertEquals(400, app.frame.getContentPane().getHeight());
+        Assertions.assertEquals(320, app.getRenderer().getBufferSize().getWidth());
+        Assertions.assertEquals(200, app.getRenderer().getBufferSize().getHeight());
+        Assertions.assertEquals(640, app.getRenderer().getFrame().getContentPane().getWidth());
+        Assertions.assertEquals(400, app.getRenderer().getFrame().getContentPane().getHeight());
     }
 
 }
