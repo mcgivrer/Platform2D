@@ -93,6 +93,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
 
     /**
+     * default pathh to Configruation file
+     */
+    private String configurationFilePath = "/config.properties";
+
+    /**
+     * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
+     */
+    static int debug = 0;
+    /**
+     * Filtering the visual debug information screen by listing (coma separated)
+     * in the filter the targeted object's names.
+     */
+    public String debugFilter = null;
+
+    /**
      * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
      * and/or can be exposed/exported at anytime.
      */
@@ -103,15 +118,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private World world;
 
-    /**
-     * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
-     */
-    static int debug = 0;
-    /**
-     * filtering the visual debug information screen by listing (coma separated)
-     * in the filter the targeted object's names.
-     */
-    String debugFilter = null;
 
     /**
      * Flag to activate/deactivate drawing operation in the game loop.
@@ -121,7 +127,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * Flag to activate/deactivate updating operation in the game loop.
      */
     private boolean updateFlag = true;
-    private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
 
     private Renderer renderer;
@@ -129,6 +134,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private SoundManager soundManager;
     private String defaultSceneName = "start";
     private String[] strSceneList = new String[]{"start:Platform2D"};
+    private Configuration config;
 
 
     /**
@@ -991,11 +997,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
         public void keyReleased(KeyEvent e) {
-            activeScene.keyReleased(e);
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.keyReleased(e);
+
+            }
         }
 
         public void keyPressed(KeyEvent e) {
-            activeScene.keyPressed(e);
+
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.keyPressed(e);
+            }
         }
 
         public Scene getActiveScene() {
@@ -1498,13 +1510,142 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     /**
+     * The {@link Configuration} class support all operations to load and provide configuration attribute values,
+     * and parsed CLI arguments.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
+    public static class Configuration {
+
+        /**
+         * The required configuration key/values to define internal attributes default values at start.
+         */
+        private static Properties props = new Properties();
+        private final Platform2D app;
+
+        private Map<String, Object> configValues = new ConcurrentHashMap<>();
+
+        public Configuration(Platform2D app) {
+            this.app = app;
+        }
+
+
+        public void initializeDefaultConfiguration() {
+            props.put("app.debug.level", "0");
+            props.put("app.debug.filter", "");
+            props.put("app.screen.size", "320x200");
+            props.put("app.window.size", "640x400");
+            props.put("app.scenes.default", "start");
+            if (!app.testMode) {
+                props.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
+                props.put("app.test.mode", "false");
+            }
+        }
+
+        /**
+         * Return the configuration values corresponding to the provided key.
+         *
+         * @param key the key for the configuration value to be retrieved.
+         * @param <T>
+         * @return the T value for this configuration key.
+         */
+        public <T> T getValue(String key) {
+            return (T) configValues.getOrDefault(key, "unknown confiugration key");
+        }
+
+        /**
+         * Set a value for the configuration key.
+         *
+         * @param key   the key of this configuration value.
+         * @param value the value to store
+         * @param <T>   the type of the value.
+         */
+        public <T> void setValue(String key, T value) {
+            configValues.put(key, value);
+        }
+
+        /**
+         * Load configuration file.
+         *
+         * @param configPathFile the properties file.
+         */
+        public Properties loadConfiguration(String configPathFile) {
+            try {
+                props.load(Platform2D.class.getResourceAsStream(configPathFile));
+                parseArguments();
+            } catch (IOException e) {
+                error("Unable to load file %s", configPathFile);
+            }
+            return props;
+        }
+
+        /**
+         * Parse the String list of argument, each noted <code>key=value</code>.
+         *
+         * @param args the list of String to be processed.
+         */
+        public void parseArguments(String[] args) {
+            Map<String, Object> attributes = Arrays.stream(args)
+                .map(s -> s.split("="))
+                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+            parseAttributes(attributes);
+        }
+
+        /**
+         * Parse the list of entry from this {@link Properties} instance.
+         */
+        public void parseArguments() {
+            Map<String, Object> attributes = props.entrySet().stream()
+                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+            parseAttributes(attributes);
+        }
+
+        /**
+         * Parse all the entries from the map and assign accordingly internal
+         * variables with corresponding values.
+         *
+         * @param attributes the map of (key,value) to feed the configuration.
+         */
+        public void parseAttributes(Map<String, Object> attributes) {
+            if (!attributes.isEmpty()) {
+                for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+                    // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
+                    switch (key) {
+                        case "configuration.file", "config", "cf" -> configValues.put(key, (String) value);
+                        case "app.screen.size", "buffer", "b" -> {
+                            String[] values = ((String) value).split("x");
+                            configValues.put(key, new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1])));
+                        }
+                        case "app.window.size", "window", "w" -> {
+                            String[] values = ((String) value).split("x");
+                            configValues.put(key, new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1])));
+                        }
+                        case "app.debug.level", "debug", "d" -> configValues.put(key, Integer.parseInt((String) value));
+                        case "app.debug.filter", "filter", "df" -> configValues.put(key, (String) value);
+                        case "app.test.mode", "test" -> configValues.put(key, Boolean.parseBoolean((String) value));
+                        case "app.scenes.default", "default" -> configValues.put(key, (String) value);
+                        case "app.scenes.list", "scenes" -> configValues.put(key, ((String) value)
+                            // sanitize string
+                            .replace(",,", ",")
+                            .replace("::", ":")
+                            // split scene items
+                            .split(","));
+                        default -> warn("Value entry unknown %s=%s", key, value);
+                    }
+                }
+            } else {
+                error("Configuration is missing");
+            }
+        }
+    }
+
+    /**
      * The translated messages to be displayed in log or on screen.
      */
     private static ResourceBundle messages = ResourceBundle.getBundle("i18n.messages");
-    /**
-     * The required configuration key/values to define internal attributes default values at start.
-     */
-    private static Properties config = new Properties();
 
 
     /**
@@ -1533,11 +1674,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     void initialize(String[] args) {
         // load configuration
-        initializeDefaultConfiguration();
-        parseArguments(args);
-        config = loadConfiguration(configurationFilePath);
-        parseArguments(config);
-        parseArguments(args);
+        config = new Configuration(this);
+        config.initializeDefaultConfiguration();
+        config.parseArguments(args);
+        config.loadConfiguration(configurationFilePath);
+        config.parseArguments();
+        config.parseArguments(args);
+
+        // set internals according to configuration.
+        screenSize = config.getValue("app.window.size");
+        bufferSize = config.getValue("app.screen.size");
+        testMode = config.getValue("app.test.mode");
+        debugFilter = config.getValue("app.debug.filter");
+        debug = config.getValue("app.debug.level");
 
         // set Content size
         setPreferredSize(screenSize);
@@ -1553,19 +1702,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         // prepare Scenes
         scnManager = new SceneManager(this);
-        scnManager.load(strSceneList);
+        scnManager.load(config.getValue("app.scenes.list"));
         if (!testMode && scnManager.getScenes().isEmpty()) {
             Scene start = new StartScene(this);
             setWorld(new World());
             scnManager.add(start);
         }
         // Activate the default scene
-        scnManager.activate(defaultSceneName);
+        scnManager.activate(config.getValue("app.scenes.default"));
         logDebugSceneTreeNode((Node) scnManager.getActive(), 0);
     }
 
     /**
-     * trace content of the Scene tree structure.
+     * Log content of the Scene tree structure.
      *
      * @param node  the Starting point of the tree parsing
      * @param level the depth of parsing.
@@ -1587,95 +1736,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return messages.getString(key);
     }
 
-    private void initializeDefaultConfiguration() {
-        config.put("app.debug.level", "0");
-        config.put("app.debug.filter", "");
-        config.put("app.screen.size", "320x200");
-        config.put("app.window.size", "640x400");
-        config.put("app.scenes.default", "start");
-        if (!testMode) {
-            config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
-            config.put("app.test.mode", "false");
-        }
-    }
-
-    /**
-     * Load configuration file.
-     *
-     * @param configPathFile the properties file.
-     */
-    private Properties loadConfiguration(String configPathFile) {
-        try {
-            config.load(Platform2D.class.getResourceAsStream(configPathFile));
-            parseArguments(config);
-        } catch (IOException e) {
-            error("Unable to load file %s", configPathFile);
-        }
-        return config;
-    }
-
-    /**
-     * Parse the String list of argument, each noted <code>key=value</code>.
-     *
-     * @param args the list of String to be processed.
-     */
-    private void parseArguments(String[] args) {
-        Map<String, Object> attributes = Arrays.stream(args)
-            .map(s -> s.split("="))
-            .collect(Collectors.toMap(split -> split[0], split -> split[1]));
-        parseAttributes(attributes);
-    }
-
-    /**
-     * Parse the list of entry from this {@link Properties} instance.
-     *
-     * @param props the Properties instance to feed with all configuration attributes.
-     */
-    private void parseArguments(Properties props) {
-        Map<String, Object> attributes = props.entrySet().stream()
-            .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
-        parseAttributes(attributes);
-    }
-
-    /**
-     * Parse all the entries from the map and assign accordingly internal
-     * variables with corresponding values.
-     *
-     * @param attributes the map of (key,value) to feed the configuration.
-     */
-    private void parseAttributes(Map<String, Object> attributes) {
-        if (!attributes.isEmpty()) {
-            for (Map.Entry<String, Object> entry : attributes.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-                // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
-                switch (key) {
-                    case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
-                    case "app.screen.size", "buffer", "b" -> {
-                        String[] values = ((String) value).split("x");
-                        bufferSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
-                    }
-                    case "app.window.size", "window", "w" -> {
-                        String[] values = ((String) value).split("x");
-                        screenSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
-                    }
-                    case "app.debug.level", "debug", "d" -> debug = Integer.parseInt((String) value);
-                    case "app.debug.filter", "filter", "df" -> debugFilter = (String) value;
-                    case "app.test.mode", "test" -> this.testMode = Boolean.parseBoolean((String) value);
-                    case "app.scenes.default", "default" -> this.defaultSceneName = (String) value;
-                    case "app.scenes.list", "scenes" -> this.strSceneList = ((String) value)
-                        // sanitize string
-                        .replace(",,", ",")
-                        .replace("::", ":")
-                        // split scene items
-                        .split(",");
-                    default -> warn("Value entry unknown %s=%s", key, value);
-                }
-            }
-        } else {
-            error("Configuration is missing");
-        }
-    }
 
     /**
      * Retrieve from cache or Load a resource from the storage.
