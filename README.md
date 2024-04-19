@@ -1,5 +1,9 @@
 # README
 
+
+[![Build](https://github.com/mcgivrer/Platform2D/actions/workflows/build.yml/badge.svg)](https://github.com/mcgivrer/Platform2D/actions/workflows/build.yml) [![CodeQL](https://github.com/mcgivrer/Platform2D/actions/workflows/codeql.yml/badge.svg)](https://github.com/mcgivrer/Platform2D/actions/workflows/codeql.yml) [![Deploy GitHub Pages](https://github.com/mcgivrer/Platform2D/actions/workflows/jekyll-gh-pages.yml/badge.svg)](https://github.com/mcgivrer/Platform2D/actions/workflows/jekyll-gh-pages.yml)
+
+
 ## Context
 
 This Platform2D class is an optimized mono class 2D platform game framework bringing all the required basic features to
