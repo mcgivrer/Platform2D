@@ -38,11 +38,9 @@ public class Platform2DPhysicProcessingTest {
             .setAcceleration(0.5, 0.5)
             .setStaticObject(false);
         scn.add(gameObject);
-        platform.update(16);
-        Assertions.assertEquals(116.0, gameObject.x, 0.01);
-        Assertions.assertEquals(117.26, gameObject.y, 0.01);
+        platform.update(60);
+        Assertions.assertEquals(150.00, gameObject.x, 0.01);
+        Assertions.assertEquals(150.00, gameObject.y, 0.01);
         platform.dispose();
     }
-
-
 }

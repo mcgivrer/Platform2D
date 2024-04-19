@@ -93,6 +93,21 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
 
     /**
+     * default pathh to Configruation file
+     */
+    private String configurationFilePath = "/config.properties";
+
+    /**
+     * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
+     */
+    static int debug = 0;
+    /**
+     * Filtering the visual debug information screen by listing (coma separated)
+     * in the filter the targeted object's names.
+     */
+    public String debugFilter = null;
+
+    /**
      * Internal map of KPI (statistics) to be maintained by the {@link Platform2D} instance,
      * and/or can be exposed/exported at anytime.
      */
@@ -103,15 +118,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     private World world;
 
-    /**
-     * internal debugger flag (0=no debug, to 5 max debug and visual debug info)
-     */
-    static int debug = 0;
-    /**
-     * filtering the visual debug information screen by listing (coma separated)
-     * in the filter the targeted object's names.
-     */
-    String debugFilter = null;
 
     /**
      * Flag to activate/deactivate drawing operation in the game loop.
@@ -121,7 +127,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * Flag to activate/deactivate updating operation in the game loop.
      */
     private boolean updateFlag = true;
-    private String configurationFilePath = "/config.properties";
     private boolean testMode = false;
 
     private Renderer renderer;
@@ -129,6 +134,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     private SoundManager soundManager;
     private String defaultSceneName = "start";
     private String[] strSceneList = new String[]{"start:Platform2D"};
+    private Configuration config;
 
 
     /**
@@ -449,6 +455,10 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.height = playArea.getHeight();
             return this;
         }
+
+        public <T> T getAttribute(String attrName, T defaultValue) {
+            return (T) attributes.getOrDefault(attrName, defaultValue);
+        }
     }
 
     /**
@@ -574,7 +584,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 for (int i = 0; i < chunk; i++) {
                     behaviors.stream().filter(b -> b instanceof ParticleBehavior<? extends Node>).forEach(b -> {
                         add(
-                                ((ParticleBehavior<? extends Node>) b).create(scene, this)
+                            ((ParticleBehavior<? extends Node>) b).create(scene, this)
                         );
                     });
                 }
@@ -612,7 +622,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             this.playArea = playAreaSize;
         }
 
-        public void addConstrain(ConstraintObject constrain) {
+        public void addConstraint(ConstraintObject constrain) {
             constrain.staticObject = true;
             constrains.add(constrain);
         }
@@ -670,14 +680,14 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             super.update(dt);
 
             this.x += Math
-                    .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.x + (target.getWidth() * 0.5) - ((viewport.getWidth()) * 0.5) - this.x)
+                    * tweenFactor * Math.min(dt, 10));
             this.y += Math
-                    .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
-                            * tweenFactor * Math.min(dt, 10));
+                .ceil((target.y + (target.getHeight() * 0.5) - ((viewport.getHeight()) * 0.5) - this.y)
+                    * tweenFactor * Math.min(dt, 10));
 
             this.viewport.setRect(this.x, this.y, this.viewport.getWidth(),
-                    this.viewport.getHeight());
+                this.viewport.getHeight());
 
         }
     }
@@ -852,7 +862,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             // add background Image
             BufferedImage bckImage = (BufferedImage) getResource("/assets/images/backgrounds/volcano.png");
             ImageObject backgroundIObj = (ImageObject) new ImageObject("background")
-                    .setImage(bckImage).setPriority(0);
+                .setImage(bckImage).setPriority(0);
             add(backgroundIObj);
 
             // add welcome message
@@ -861,15 +871,15 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             gb.setFont(welcomeFont);
             int textWidth = gb.getFontMetrics().stringWidth(welcomeTxt);
             TextObject txtObject = (TextObject) new TextObject("welcome")
-                    .setText(welcomeTxt)
-                    .setShadowColor(Color.BLACK)
-                    .setFont(welcomeFont)
-                    .setPosition(
-                            (renderer.getBufferSize().width - textWidth) * 0.5,
-                            renderer.getBufferSize().height * 0.5)
-                    .setBorderColor(Color.WHITE)
-                    .setPriority(1)
-                    .setStaticObject(true);
+                .setText(welcomeTxt)
+                .setShadowColor(Color.BLACK)
+                .setFont(welcomeFont)
+                .setPosition(
+                    (renderer.getBufferSize().width - textWidth) * 0.5,
+                    renderer.getBufferSize().height * 0.5)
+                .setBorderColor(Color.WHITE)
+                .setPriority(1)
+                .setStaticObject(true);
             add(txtObject);
         }
 
@@ -987,11 +997,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         }
 
         public void keyReleased(KeyEvent e) {
-            activeScene.keyReleased(e);
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.keyReleased(e);
+
+            }
         }
 
         public void keyPressed(KeyEvent e) {
-            activeScene.keyPressed(e);
+
+            if (Optional.ofNullable(activeScene).isPresent()) {
+                activeScene.keyPressed(e);
+            }
         }
 
         public Scene getActiveScene() {
@@ -1024,6 +1040,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
     /**
      * ParticleBehavior is
+     *
      * @param <T>
      */
     public interface ParticleBehavior<T extends Node> extends Behavior<T> {
@@ -1125,19 +1142,39 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
          */
         private Dimension screenSize;
 
+        /**
+         * Initialize the {@link Renderer} service by registering the default {@link RenderPlugin} implementation.
+         *
+         * @param app the parent Application.
+         */
         public Renderer(Platform2D app) {
             this.app = app;
-            addPlugin(new GameObjectRenderPlugin());
-            addPlugin(new TextObjectRenderPlugin());
-            addPlugin(new ImageObjectRenderPlugin());
-            addPlugin(new ConstraintObjectRenderPlugin());
-            addPlugin(new ParticleSystemRenderPlugin());
+            register(new GameObjectRenderPlugin());
+            register(new TextObjectRenderPlugin());
+            register(new ImageObjectRenderPlugin());
+            register(new ConstraintObjectRenderPlugin());
+            register(new ParticleSystemRenderPlugin());
         }
 
-        public void addPlugin(RenderPlugin<? extends GameObject> renderPlugin) {
+        /**
+         * register a new {@link RenderPlugin} implementation to the Renderer.
+         *
+         * @param renderPlugin the new implementation to be registered.
+         */
+        public void register(RenderPlugin<? extends GameObject> renderPlugin) {
             plugins.put(renderPlugin.getObjectClass(), renderPlugin);
         }
 
+        /**
+         * Initialize the internal rendering buffer ({@link BufferedImage}) and {@link JFrame} component.
+         * <p>Create a default buffer strategy set to three buffers.</p>
+         * <p>Add the parent app attribute as a KeyListener to the JFrame.</p>
+         *
+         * <p>If not in test mode (`testMode`=true), show the JFrame (`visible`=true)</p>
+         *
+         * @param bufferSize the rendering buffer {@link Dimension}.
+         * @param screenSize the window component {@link Dimension}.
+         */
         public void initialize(Dimension bufferSize, Dimension screenSize) {
             this.bufferSize = bufferSize;
             this.screenSize = screenSize;
@@ -1159,8 +1196,16 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             frame.createBufferStrategy(3);
         }
 
-        public void draw(Scene s, Map<String, Object> stats) {
-            Camera camera = s.getCamera();
+        /**
+         * <p>Draw all objects from the scene, using Camera point of view if a {@link Camera}exists in the {@link Scene}.</p>
+         * <blockquote>if the debug level is greater than zero, show the statistics.</blockquote>
+         * <p></p>
+         *
+         * @param scene the Scene instance to be rendered
+         * @param stats the Map of statistics.
+         */
+        public void draw(Scene scene, Map<String, Object> stats) {
+            Camera camera = scene.getCamera();
             Graphics2D gb = buffer.createGraphics();
             // set Antialiasing mode
             gb.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -1170,21 +1215,25 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             gb.setBackground(Color.BLACK);
             gb.clearRect(0, 0, 640, 400);
 
+            // if a Camera exists, move from the camera's point of view.
             if (Optional.ofNullable(camera).isPresent()) {
                 gb.translate(-camera.x, -camera.y);
             }
-            drawAllEntity(gb, s, false);
+            drawAllEntity(gb, scene, false);
 
-            if (Optional.ofNullable(s.getWorld()).isPresent() && debug > 1) {
+            // if the debug mode is active, daw the world limits.
+            if (Optional.ofNullable(scene.getWorld()).isPresent() && debug > 1) {
                 gb.setColor(Color.YELLOW);
-                gb.draw(s.getWorld().getPlayArea());
+                gb.draw(scene.getWorld().getPlayArea());
             }
 
+            // if a Camera exists, move back from the camera's point of view.
             if (Optional.ofNullable(camera).isPresent()) {
                 gb.translate(camera.x, camera.y);
             }
-            drawAllEntity(gb, s, true);
-            s.draw(app, gb, stats);
+            // draw all the other objects that are stick to the camera.
+            drawAllEntity(gb, scene, true);
+            scene.draw(app, gb, stats);
 
             gb.dispose();
 
@@ -1192,35 +1241,31 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             displayToWindow(stats);
         }
 
-        private void draw(Map<String, Object> stats) {
-
-        }
-
         /**
-         * Draw all entities
+         * Draw all entities from the {@link Scene} according to {@link GameObject#getStickToCamera()}  status.
          *
-         * @param gb            the Graphics API
-         * @param scn           Scene to be drawn.
+         * @param gb            The {@link Graphics2D} API instance.
+         * @param scn           The {@link Scene} to draw.
          * @param stickToCamera define if entities must be moved with the {@link Camera} offset.
          */
         private void drawAllEntity(Graphics2D gb, Scene scn, boolean stickToCamera) {
             // draw all the platform game's scene.
 
             scn.getChild().stream()
-                    .filter(Node::isActive)
-                    .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
-                    .sorted(Comparator.comparingInt((Node o) -> ((GameObject) o).getPriority()))
-                    .forEach(o -> {
-                        GameObject go = (GameObject) o;
-                        drawGameObject(gb, scn, go);
-                        drawDebugInfo(gb, go);
-                        go.getChild().forEach(c -> {
-                            drawGameObject(gb, scn, (GameObject) c);
-                            drawDebugInfo(gb, (GameObject) c);
-                        });
-
-
+                .filter(Node::isActive)
+                .filter(o -> ((GameObject) o).getStickToCamera() == stickToCamera)
+                .sorted(Comparator.comparingInt((Node o) -> ((GameObject) o).getPriority()))
+                .forEach(o -> {
+                    GameObject go = (GameObject) o;
+                    drawGameObject(gb, scn, go);
+                    drawDebugInfo(gb, go);
+                    go.getChild().forEach(c -> {
+                        drawGameObject(gb, scn, (GameObject) c);
+                        drawDebugInfo(gb, (GameObject) c);
                     });
+
+
+                });
         }
 
         /**
@@ -1228,9 +1273,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
          * using the {@link Graphics2D} API <code>gb</code>.
          *
          * <p>The drawing method depends on the real nature  of the object (its class).</p>
-         *
-         * <blockquote><em><strong>TODO</strong> A possible evolution consists in replacing the specific internal implementation with an
-         * extensible plugin pattern. See <a href="https://github.com/mcgivrer/Platform2D/issues/4">issue #4</a>.</em></blockquote>
+         * <p>The <em>Plugin pattern</em> is used to implements specific rendering methods depending of GameObject's nature.
+         * See the {@link RenderPlugin} interface and the {@link Renderer} implementation.</p>
+         * <p>Rendering process is now delegated to the {@link RenderPlugin#draw(Graphics2D, Scene, Node)} implementation method.</p>
          *
          * @param gb  the Graphics API
          * @param scn the {@link Scene} parent of the {@link GameObject}.
@@ -1254,13 +1299,13 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.drawImage(buffer,
-                    0, 0, screenSize.width, screenSize.height,
-                    0, 0, bufferSize.width, bufferSize.height,
-                    null);
+                0, 0, screenSize.width, screenSize.height,
+                0, 0, bufferSize.width, bufferSize.height,
+                null);
             g.setColor(Color.ORANGE);
             if (debug > 0) {
                 g.drawString(prepareStatsString(stats, "[ ", " ]", " | "),
-                        16, frame.getHeight() - 16);
+                    16, frame.getHeight() - 16);
             }
             g.dispose();
             frame.getBufferStrategy().show();
@@ -1274,7 +1319,7 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
          */
         private void drawDebugInfo(Graphics2D gb, GameObject o) {
             if (Optional.ofNullable(app.debugFilter).isPresent()
-                    && (app.debugFilter.contains(o.name) || app.debugFilter.equals("all"))) {
+                && (app.debugFilter.contains(o.name) || app.debugFilter.equals("all"))) {
                 if (debug > 0) {
                     gb.setColor(Color.ORANGE);
                     gb.setFont(gb.getFont().deriveFont(9.0f));
@@ -1295,24 +1340,24 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                             for (Vec2d f : o.forces) {
                                 gb.setColor(Color.WHITE);
                                 gb.drawLine(
-                                        (int) (o.x + (o.width * 0.5)),
-                                        (int) (o.y + (o.height * 0.5)),
-                                        (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
-                                        (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
+                                    (int) (o.x + (o.width * 0.5)),
+                                    (int) (o.y + (o.height * 0.5)),
+                                    (int) ((o.x + (o.width * 0.5)) + f.x * 100.0),
+                                    (int) ((o.y + (o.height * 0.5)) + f.y * 100.0));
                             }
                             // draw velocity
                             gb.setColor(Color.GREEN);
                             gb.drawLine(
-                                    (int) (o.x + (o.width * 0.5)),
-                                    (int) (o.y + (o.height * 0.5)),
-                                    (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
-                                    (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
+                                (int) (o.x + (o.width * 0.5)),
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.dx * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.dy * 100.0));
                             // draw Acceleration
                             gb.setColor(Color.BLUE);
                             gb.drawLine((int) (o.x + (o.width * 0.5)),
-                                    (int) (o.y + (o.height * 0.5)),
-                                    (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
-                                    (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
+                                (int) (o.y + (o.height * 0.5)),
+                                (int) ((o.x + (o.width * 0.5)) + o.ax * 100.0),
+                                (int) ((o.y + (o.height * 0.5)) + o.ay * 100.0));
                         }
                     }
                 }
@@ -1465,13 +1510,142 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
     }
 
     /**
+     * The {@link Configuration} class support all operations to load and provide configuration attribute values,
+     * and parsed CLI arguments.
+     *
+     * @author Frederic Delorme
+     * @since 1.0.1
+     */
+    public static class Configuration {
+
+        /**
+         * The required configuration key/values to define internal attributes default values at start.
+         */
+        private static Properties props = new Properties();
+        private final Platform2D app;
+
+        private Map<String, Object> configValues = new ConcurrentHashMap<>();
+
+        public Configuration(Platform2D app) {
+            this.app = app;
+        }
+
+
+        public void initializeDefaultConfiguration() {
+            props.put("app.debug.level", "0");
+            props.put("app.debug.filter", "");
+            props.put("app.screen.size", "320x200");
+            props.put("app.window.size", "640x400");
+            props.put("app.scenes.default", "start");
+            if (!app.testMode) {
+                props.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
+                props.put("app.test.mode", "false");
+            }
+        }
+
+        /**
+         * Return the configuration values corresponding to the provided key.
+         *
+         * @param key the key for the configuration value to be retrieved.
+         * @param <T>
+         * @return the T value for this configuration key.
+         */
+        public <T> T getValue(String key) {
+            return (T) configValues.getOrDefault(key, "unknown confiugration key");
+        }
+
+        /**
+         * Set a value for the configuration key.
+         *
+         * @param key   the key of this configuration value.
+         * @param value the value to store
+         * @param <T>   the type of the value.
+         */
+        public <T> void setValue(String key, T value) {
+            configValues.put(key, value);
+        }
+
+        /**
+         * Load configuration file.
+         *
+         * @param configPathFile the properties file.
+         */
+        public Properties loadConfiguration(String configPathFile) {
+            try {
+                props.load(Platform2D.class.getResourceAsStream(configPathFile));
+                parseArguments();
+            } catch (IOException e) {
+                error("Unable to load file %s", configPathFile);
+            }
+            return props;
+        }
+
+        /**
+         * Parse the String list of argument, each noted <code>key=value</code>.
+         *
+         * @param args the list of String to be processed.
+         */
+        public void parseArguments(String[] args) {
+            Map<String, Object> attributes = Arrays.stream(args)
+                .map(s -> s.split("="))
+                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
+            parseAttributes(attributes);
+        }
+
+        /**
+         * Parse the list of entry from this {@link Properties} instance.
+         */
+        public void parseArguments() {
+            Map<String, Object> attributes = props.entrySet().stream()
+                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
+            parseAttributes(attributes);
+        }
+
+        /**
+         * Parse all the entries from the map and assign accordingly internal
+         * variables with corresponding values.
+         *
+         * @param attributes the map of (key,value) to feed the configuration.
+         */
+        public void parseAttributes(Map<String, Object> attributes) {
+            if (!attributes.isEmpty()) {
+                for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+                    // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
+                    switch (key) {
+                        case "configuration.file", "config", "cf" -> configValues.put(key, (String) value);
+                        case "app.screen.size", "buffer", "b" -> {
+                            String[] values = ((String) value).split("x");
+                            configValues.put(key, new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1])));
+                        }
+                        case "app.window.size", "window", "w" -> {
+                            String[] values = ((String) value).split("x");
+                            configValues.put(key, new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1])));
+                        }
+                        case "app.debug.level", "debug", "d" -> configValues.put(key, Integer.parseInt((String) value));
+                        case "app.debug.filter", "filter", "df" -> configValues.put(key, (String) value);
+                        case "app.test.mode", "test" -> configValues.put(key, Boolean.parseBoolean((String) value));
+                        case "app.scenes.default", "default" -> configValues.put(key, (String) value);
+                        case "app.scenes.list", "scenes" -> configValues.put(key, ((String) value)
+                            // sanitize string
+                            .replace(",,", ",")
+                            .replace("::", ":")
+                            // split scene items
+                            .split(","));
+                        default -> warn("Value entry unknown %s=%s", key, value);
+                    }
+                }
+            } else {
+                error("Configuration is missing");
+            }
+        }
+    }
+
+    /**
      * The translated messages to be displayed in log or on screen.
      */
     private static ResourceBundle messages = ResourceBundle.getBundle("i18n.messages");
-    /**
-     * The required configuration key/values to define internal attributes default values at start.
-     */
-    private static Properties config = new Properties();
 
 
     /**
@@ -1500,11 +1674,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     void initialize(String[] args) {
         // load configuration
-        initializeDefaultConfiguration();
-        parseArguments(args);
-        config = loadConfiguration(configurationFilePath);
-        parseArguments(config);
-        parseArguments(args);
+        config = new Configuration(this);
+        config.initializeDefaultConfiguration();
+        config.parseArguments(args);
+        config.loadConfiguration(configurationFilePath);
+        config.parseArguments();
+        config.parseArguments(args);
+
+        // set internals according to configuration.
+        screenSize = config.getValue("app.window.size");
+        bufferSize = config.getValue("app.screen.size");
+        testMode = config.getValue("app.test.mode");
+        debugFilter = config.getValue("app.debug.filter");
+        debug = config.getValue("app.debug.level");
 
         // set Content size
         setPreferredSize(screenSize);
@@ -1520,19 +1702,19 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
 
         // prepare Scenes
         scnManager = new SceneManager(this);
-        scnManager.load(strSceneList);
+        scnManager.load(config.getValue("app.scenes.list"));
         if (!testMode && scnManager.getScenes().isEmpty()) {
             Scene start = new StartScene(this);
             setWorld(new World());
             scnManager.add(start);
         }
         // Activate the default scene
-        scnManager.activate(defaultSceneName);
+        scnManager.activate(config.getValue("app.scenes.default"));
         logDebugSceneTreeNode((Node) scnManager.getActive(), 0);
     }
 
     /**
-     * trace content of the Scene tree structure.
+     * Log content of the Scene tree structure.
      *
      * @param node  the Starting point of the tree parsing
      * @param level the depth of parsing.
@@ -1554,90 +1736,6 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         return messages.getString(key);
     }
 
-    private void initializeDefaultConfiguration() {
-        config.put("app.debug.level", "0");
-        config.put("app.debug.filter", "");
-        config.put("app.screen.size", "320x200");
-        config.put("app.window.size", "640x400");
-        config.put("app.scenes.default", "start");
-        if (!testMode) {
-            config.put("app.scenes.list", "start:com.snapgames.platform.PlatForm2D.StartScene,");
-            config.put("app.test.mode", "false");
-        }
-    }
-
-    /**
-     * Load configuration file.
-     *
-     * @param configPathFile the properties file.
-     */
-    private Properties loadConfiguration(String configPathFile) {
-        try {
-            config.load(Platform2D.class.getResourceAsStream(configPathFile));
-            parseArguments(config);
-        } catch (IOException e) {
-            error("Unable to load file %s", configPathFile);
-        }
-        return config;
-    }
-
-    /**
-     * Parse the String list of argument, each noted <code>key=value</code>.
-     *
-     * @param args the list of String to be processed.
-     */
-    private void parseArguments(String[] args) {
-        Map<String, Object> attributes = Arrays.stream(args)
-                .map(s -> s.split("="))
-                .collect(Collectors.toMap(split -> split[0], split -> split[1]));
-        parseAttributes(attributes);
-    }
-
-    /**
-     * Parse the list of entry from this {@link Properties} instance.
-     *
-     * @param props the Properties instance to feed with all configuration attributes.
-     */
-    private void parseArguments(Properties props) {
-        Map<String, Object> attributes = props.entrySet().stream()
-                .collect(Collectors.toMap(split -> (String) split.getKey(), Map.Entry::getValue));
-        parseAttributes(attributes);
-    }
-
-    /**
-     * Parse all the entries from the map and assign accordingly internal
-     * variables with corresponding values.
-     *
-     * @param attributes the map of (key,value) to feed the configuration.
-     */
-    private void parseAttributes(Map<String, Object> attributes) {
-        if (!attributes.isEmpty()) {
-            for (Map.Entry<String, Object> entry : attributes.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-                // Each entry is cased as ("configuration key", "long CLI argument", "short key argument")
-                switch (key) {
-                    case "configuration.file", "config", "cf" -> configurationFilePath = (String) value;
-                    case "app.screen.size", "buffer", "b" -> {
-                        String[] values = ((String) value).split("x");
-                        bufferSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
-                    }
-                    case "app.window.size", "window", "w" -> {
-                        String[] values = ((String) value).split("x");
-                        screenSize = new Dimension(Integer.parseInt(values[0]), Integer.parseInt(values[1]));
-                    }
-                    case "app.debug.level", "debug", "d" -> debug = Integer.parseInt((String) value);
-                    case "app.debug.filter", "filter", "df" -> debugFilter = (String) value;
-                    case "app.test.mode", "test" -> this.testMode = Boolean.parseBoolean((String) value);
-                    case "app.scenes.default", "default" -> this.defaultSceneName = (String) value;
-                    case "app.scenes.list", "scenes" -> this.strSceneList = ((String) value).split(",");
-                    default -> warn("Value entry unknown %s=%s", key, value);
-                }
-            }
-        } else {
-            error("Configuration is missing");
-        }
-    }
 
     /**
      * Retrieve from cache or Load a resource from the storage.
@@ -1775,17 +1873,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      * @param elapsed       the elapsed time between two loop iterations.
      */
     private void updateStats(
-            Map<String, Object> stats,
-            long framesPerSec,
-            long updatesPerSec,
-            long gameTime,
-            double elapsed) {
+        Map<String, Object> stats,
+        long framesPerSec,
+        long updatesPerSec,
+        long gameTime,
+        double elapsed) {
         Scene scn = getSceneManager().getActiveScene();
         List<GameObject> objects = (List<GameObject>) scn.getChild();
         long countActive = objects.stream()
-                .filter(Node::isActive).count();
+            .filter(Node::isActive).count();
         long countStatic = objects.stream()
-                .filter(GameObject::isObjectStatic).count();
+            .filter(GameObject::isObjectStatic).count();
         stats.put("0:debug", debug);
         stats.put("1:obj", objects.size());
         stats.put("2:static", countStatic);
@@ -1823,41 +1921,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Scene scn = getSceneManager().getActiveScene();
 
         scn.getChild().stream()
-                // process only active and non-static objects
-                .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
-                .forEach(n -> {
-                    GameObject o = (GameObject) n;
-                    // reset current GameObject acceleration
-                    o.ax = 0;
-                    o.ay = 0;
-
-                    // apply all concerned World constraints
-                    applyWorldConstraints(world, o, elapsed);
-
-                    // add applied forces on acceleration
-                    o.forces.forEach(v -> {
-                        o.ax += v.x * elapsed * PHYSIC_TIME_FACTOR;
-                        o.ay += v.y * elapsed * PHYSIC_TIME_FACTOR;
-                    });
-
-                    // compute resulting speed
-                    o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
-                    o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
-
-                    // get the GameObject o position
-                    o.x += o.dx * elapsed;
-                    o.y += o.dy * elapsed;
-
-                    // apply friction "force" to the velocity
-                    o.dx *= o.material.friction;
-                    o.dy *= o.material.friction;
-
-                    o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
-                    o.update(elapsed);
-                    keepGameObjectIntoPlayArea(scn.getWorld(), o);
-                    o.forces.clear();
-
+            // process only active and non-static objects
+            .filter(o -> !((GameObject) o).isStaticObject() && o.isActive())
+            .forEach(n -> {
+                GameObject o = (GameObject) n;
+                // reset current GameObject acceleration
+                updateObject(elapsed, o, scn);
+                o.getChild().forEach(c -> {
+                    c.update(elapsed);
+                    c.getBehaviors().forEach(b -> b.update(scn, elapsed, (GameObject) c));
                 });
+            });
 
         if (Optional.ofNullable(scnManager.getActiveScene()).isPresent()) {
             Camera camera = scnManager.getActiveScene().getCamera();
@@ -1866,6 +1940,37 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
             }
         }
         scnManager.update(stats, elapsed);
+    }
+
+    private void updateObject(double elapsed, GameObject o, Scene scn) {
+        o.ax = 0;
+        o.ay = 0;
+
+        // apply all concerned World constraints
+        applyWorldConstraints(world, o, elapsed);
+
+        // add applied forces on acceleration
+        o.forces.forEach(v -> {
+            o.ax += v.x * elapsed * PHYSIC_TIME_FACTOR;
+            o.ay += v.y * elapsed * PHYSIC_TIME_FACTOR;
+        });
+
+        // compute resulting speed
+        o.dx += (o.ax * elapsed * PHYSIC_TIME_FACTOR);
+        o.dy += (o.ay * elapsed * PHYSIC_TIME_FACTOR);
+
+        // get the GameObject o position
+        o.x += o.dx * elapsed;
+        o.y += o.dy * elapsed;
+
+        // apply friction "force" to the velocity
+        o.dx *= o.material.friction;
+        o.dy *= o.material.friction;
+
+        o.getBehaviors().forEach(b -> b.update(scn, elapsed, o));
+        o.update(elapsed);
+        keepGameObjectIntoPlayArea(scn.getWorld(), o);
+        o.forces.clear();
     }
 
     /**
@@ -2114,8 +2219,8 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
                 }
             }
             return entry.getKey().substring(((String) entry.getKey().toString()).indexOf(':') + 1)
-                    + ":"
-                    + value;
+                + ":"
+                + value;
         }).collect(Collectors.joining(delimiter)) + end;
     }
 
@@ -2129,17 +2234,17 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
         Duration duration = Duration.ofMillis(milliseconds);
         if (duration.toDays() > 0) {
             return String.format(withMS ? "%d d - %02d:%02d:%02d.%03d" : "%d d - %02d:%02d:%02d",
-                    duration.toDays(),
-                    duration.toHours() - (24 * duration.toDays()),
-                    duration.toMinutesPart(),
-                    duration.toSecondsPart(),
-                    duration.toMillisPart());
+                duration.toDays(),
+                duration.toHours() - (24 * duration.toDays()),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
         } else {
             return String.format(withMS ? "%02d:%02d:%02d.%03d" : "%02d:%02d:%02d",
-                    duration.toHours(),
-                    duration.toMinutesPart(),
-                    duration.toSecondsPart(),
-                    duration.toMillisPart());
+                duration.toHours(),
+                duration.toMinutesPart(),
+                duration.toSecondsPart(),
+                duration.toMillisPart());
 
         }
     }
@@ -2149,9 +2254,9 @@ public class Platform2D extends JPanel implements KeyListener, ComponentListener
      */
     public static void main(String[] args) {
         Platform2D platform2d = new Platform2D(
-                "Platform2D",
-                new Dimension(320, 200),
-                new Dimension(640, 400));
+            "Platform2D",
+            new Dimension(320, 200),
+            new Dimension(640, 400));
         platform2d.run(args);
     }
 }
